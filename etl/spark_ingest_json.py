@@ -71,10 +71,12 @@ def ingest_packages(spark, data_path, hdfs_output_path, execution_date):
 def main():
     """Main execution"""
     # Get values from command-line arguments
-    execution_date = sys.argv[1] if len(sys.argv) > 1 else None
-    run_id = sys.argv[2] if len(sys.argv) > 2 else None
-    DATA_PATH = sys.argv[3] if len(sys.argv) > 3 else "D:/Y3T1/Data Engineering/Logistic Data Warehouse/data/data_sources"
-    HDFS_OUTPUT_PATH = sys.argv[4] if len(sys.argv) > 4 else f"/logistics/raw/json/{execution_date}"
+    DATA_PATH = sys.argv[1] if len(sys.argv) > 1 else "data/data_sources"
+    HDFS_OUTPUT_PATH = sys.argv[2] if len(sys.argv) > 2 else "hdfs://localhost:9000/logistics/raw/json"
+    
+    # Generate execution date
+    from datetime import datetime
+    execution_date = datetime.now().strftime("%Y-%m-%d")
     
     # Create Spark session
     spark = create_spark_session("Logistics JSON Ingestion")

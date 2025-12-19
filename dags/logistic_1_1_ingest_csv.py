@@ -4,11 +4,17 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
 
+# Configuration
+OWNER_DAG = 'hadoop'
+ETL_PATH = '/home/hadoop/logistic/etl/spark_ingest_csv.py'
+DATA_SOURCE_PATH = '/home/hadoop/logistic/data/data_sources'
+HDFS_TARGET_PATH = 'localhost:9000/logistics'
+
 default_args = {
-    'owner': 'hadoop',
+    'owner': OWNER_DAG,
     'depends_on_past': False,
     'retries': 1,
-    'retry_delay': timedelta(minutes=5)
+    'retry_delay': timedelta(minutes=2)
 }
 
 dag = DAG(
@@ -23,9 +29,9 @@ dag = DAG(
 spark_command = f"""
 spark-submit \\
 --master local[*] \\
-"/home/hadoop/logistic/etl/spark_ingest_csv.py" \\
-"/home/hadoop/logistic/data/data_sources" \\
-"localhost:9000/logistics/raw/"
+"{ETL_PATH}" \\
+"{DATA_SOURCE_PATH}" \\
+"{HDFS_TARGET_PATH}"
 """
 
 extract_csv_task = BashOperator(

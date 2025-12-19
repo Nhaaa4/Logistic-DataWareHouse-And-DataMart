@@ -33,6 +33,7 @@ def ingest_customers(spark, data_path, hdfs_output_path, execution_date):
         .partitionBy("ingestion_date") \
         .parquet(output_path)
     
+    print(f"Ingested {df.count():,} customer records to HDFS: {output_path}")
     return df.count()
 
 def ingest_drivers(spark, data_path, hdfs_output_path, execution_date):
@@ -62,10 +63,12 @@ def ingest_drivers(spark, data_path, hdfs_output_path, execution_date):
 def main():
     """Main execution"""
     # Get values from command-line arguments
-    execution_date = sys.argv[1] 
-    run_id = sys.argv[2] 
-    DATA_PATH = sys.argv[3] 
-    HDFS_OUTPUT_PATH = sys.argv[4] 
+    DATA_PATH = sys.argv[1] if len(sys.argv) > 1 else "data/data_sources"
+    HDFS_OUTPUT_PATH = sys.argv[2] if len(sys.argv) > 2 else "hdfs://localhost:9000/logistics/raw/csv"
+    
+    # Generate execution date
+    from datetime import datetime
+    execution_date = datetime.now().strftime("%Y-%m-%d") 
     
     # Create Spark session
     spark = create_spark_session("Logistics CSV Ingestion")

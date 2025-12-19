@@ -4,17 +4,23 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
 
+# Configuration
+OWNER_DAG = 'hadoop'
+ETL_PATH = '/home/hadoop/logistic/etl/spark_ingest_json.py'
+DATA_SOURCE_PATH = '/home/hadoop/logistic/data/data_sources'
+HDFS_TARGET_PATH = 'localhost:9000/logistics'
+
 default_args = {
-    'owner': 'hadoop',
+    'owner': OWNER_DAG,
     'depends_on_past': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5)
 }
 
 dag = DAG(
-    'ingest_database',
+    'logistic_ingest_json',
     default_args=default_args,
-    description='Extract database sources to HDFS raw zone',
+    description='Extract JSON data sources to HDFS raw zone',
     schedule_interval='0 1 * * *',
     start_date=datetime(2025, 1, 1),
     catchup=False
@@ -23,14 +29,13 @@ dag = DAG(
 spark_command = f"""
 spark-submit \\
 --master local[*] \\
---jars "/home/hadoop/logistic/jdbc/sqlite-jdbc-3.51.1.0.jar" \\
-"/home/hadoop/logistic/etl/spark_ingest_database.py" \\
-"/home/hadoop/logistic/data/data_sources" \\
-"localhost:9000/logistics/raw/"
+"{ETL_PATH}" \\
+"{DATA_SOURCE_PATH}" \\
+"{HDFS_TARGET_PATH}"
 """
 
-extract_database_task = BashOperator(
-    task_id='extract_database_sources',
+extract_json_task = BashOperator(
+    task_id='extract_json_sources',
     bash_command=spark_command,
     dag=dag
 )
