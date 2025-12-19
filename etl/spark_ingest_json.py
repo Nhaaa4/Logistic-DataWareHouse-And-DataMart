@@ -15,7 +15,7 @@ def ingest_vehicles(spark, data_path, hdfs_output_path, execution_date):
     vehicles_path = f"{data_path}/vehicles_api.json"
     
     # Read JSON (API response format)
-    df_raw = spark.read.json(vehicles_path)
+    df_raw = spark.read.option("multiLine", "true").json(vehicles_path)
     
     # Extract data array from API response
     df = df_raw.select(explode(col("data")).alias("vehicle")) \
@@ -40,7 +40,7 @@ def ingest_packages(spark, data_path, hdfs_output_path, execution_date):
     packages_path = f"{data_path}/packages.json"
     
     # Read JSON
-    df_raw = spark.read.json(packages_path)
+    df_raw = spark.read.option("multiLine", "true").json(packages_path)
     
     # Extract packages array
     df = df_raw.select(explode(col("packages")).alias("package")) \
