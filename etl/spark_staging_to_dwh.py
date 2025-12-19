@@ -2,12 +2,13 @@
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
-    current_timestamp, current_date, lit, col, when, 
-    year, datediff, coalesce, to_date, unix_timestamp, 
+    current_timestamp, current_date, lit, col, when,
+    year, datediff, coalesce, to_date, unix_timestamp,
     floor, concat_ws
 )
 from pyspark.sql.window import Window
 import pyspark.sql.functions as F
+import psycopg2
 import sys
 from datetime import datetime
 
@@ -27,6 +28,40 @@ def get_postgres_config(host, port, database, user, password):
         "driver": "org.postgresql.Driver"
     }
     return postgres_url, postgres_properties
+
+def execute_postgres_update(postgres_url, postgres_properties, query):
+    """Execute an UPDATE query directly on PostgreSQL"""
+    # Parse connection details from JDBC URL
+    # Format: jdbc:postgresql://host:port/database
+    url_parts = postgres_url.replace("jdbc:postgresql://", "").split("/")
+    host_port = url_parts[0].split(":")
+    host = host_port[0]
+    port = host_port[1] if len(host_port) > 1 else "5432"
+    database = url_parts[1] if len(url_parts) > 1 else ""
+
+    conn = None
+    try:
+        conn = psycopg2.connect(
+            host=host,
+            port=port,
+            database=database,
+            user=postgres_properties["user"],
+            password=postgres_properties["password"]
+        )
+        cursor = conn.cursor()
+        cursor.execute(query)
+        affected_rows = cursor.rowcount
+        conn.commit()
+        cursor.close()
+        return affected_rows
+    except Exception as e:
+        print(f"Error executing UPDATE: {str(e)}")
+        if conn:
+            conn.rollback()
+        raise
+    finally:
+        if conn:
+            conn.close()
 
 def read_from_staging(spark, table_name, postgres_url, postgres_properties):
     """Read data from staging table"""
@@ -161,18 +196,10 @@ def scd_type2_dimension(spark, staging_df, dimension_name, business_key,
         keys_to_expire = changed_records.select(
             col(f"dim.{dimension_name.replace('dim_', '')}_key").alias("surrogate_key")
         ).distinct()
-        
-        # Update existing records: set expiry_date and is_current
-        # Note: This requires a SQL UPDATE statement
-        # For Spark, we'll prepare the records and use JDBC mode with overwrite
-        
-        # Prepare expired records
-        expired_records = changed_records.select(
-            *[col(f"dim.{c}") for c in current_dim.columns if c != 'expiry_date' and c != 'is_current' and c != 'updated_at']
-        ).withColumn("expiry_date", current_date()) \
-         .withColumn("is_current", lit(False)) \
-         .withColumn("updated_at", current_timestamp())
-        
+
+        # Collect keys before any write operations
+        keys_list = [row.surrogate_key for row in keys_to_expire.collect()]
+
         # Prepare new versions of changed records
         stg_columns = [col(f"stg.{c}") for c in staging_df.columns]
         new_versions = changed_records.select(*stg_columns) \
@@ -181,32 +208,16 @@ def scd_type2_dimension(spark, staging_df, dimension_name, business_key,
             .withColumn("is_current", lit(True)) \
             .withColumn("created_at", current_timestamp()) \
             .withColumn("updated_at", current_timestamp())
-        
+
         # Remove staging metadata columns
         cols_to_drop = ['load_timestamp', 'source_file']
         for col_name in cols_to_drop:
             if col_name in new_versions.columns:
                 new_versions = new_versions.drop(col_name)
-        
-        # Since Spark JDBC doesn't support UPDATE directly, we'll use a different approach:
-        # 1. Mark old records in a temporary DataFrame
-        # 2. Write new versions
-        # Note: In production, you'd typically use SQL UPDATE statements or merge operations
-        
+
         print(f"Creating new versions for {new_versions.count()} changed records")
-        
-        # Write new versions
-        new_versions.write \
-            .jdbc(url=postgres_url, 
-                  table=f"dwh.{dimension_name}", 
-                  mode="append", 
-                  properties=postgres_properties)
-        
-        # For expiring old records, we need to execute SQL UPDATE
-        # This is done via JDBC connection
-        from pyspark.sql import Row
-        
-        keys_list = [row.surrogate_key for row in keys_to_expire.collect()]
+
+        # Step 1: Expire old records first (before inserting new versions)
         if keys_list:
             update_query = f"""
             UPDATE dwh.{dimension_name}
@@ -216,11 +227,17 @@ def scd_type2_dimension(spark, staging_df, dimension_name, business_key,
             WHERE {dimension_name.replace('dim_', '')}_key IN ({','.join(map(str, keys_list))})
             AND is_current = TRUE
             """
-            
-            # Execute update via JDBC (requires connection)
-            # Note: This is a simplified version. In production, use proper connection handling
-            print(f"Expiring {len(keys_list)} old records")
-            print(f"Update query prepared for {dimension_name}")
+            print(f"Expiring {len(keys_list)} old records in {dimension_name}...")
+            affected_rows = execute_postgres_update(postgres_url, postgres_properties, update_query)
+            print(f"Expired {affected_rows} old records")
+
+        # Step 2: Insert new versions
+        new_versions.write \
+            .jdbc(url=postgres_url,
+                  table=f"dwh.{dimension_name}",
+                  mode="append",
+                  properties=postgres_properties)
+        print(f"Inserted {new_versions.count()} new version records")
     
     print(f"{'='*70}\n")
     return new_records.count() + changed_records.count()
@@ -228,11 +245,14 @@ def scd_type2_dimension(spark, staging_df, dimension_name, business_key,
 def load_dim_customer(spark, postgres_url, postgres_properties):
     """Load customer dimension with SCD Type 2"""
     staging_df = read_from_staging(spark, "stg_customer", postgres_url, postgres_properties)
-    
+
     if staging_df.count() == 0:
         print("No customer data in staging")
         return 0
-    
+
+    # Cast date columns from string to date type
+    staging_df = staging_df.withColumn("date_of_birth", to_date(col("date_of_birth")))
+
     # Add calculated columns
     staging_df = staging_df.withColumn(
         "age",
@@ -256,11 +276,15 @@ def load_dim_customer(spark, postgres_url, postgres_properties):
 def load_dim_driver(spark, postgres_url, postgres_properties):
     """Load driver dimension with SCD Type 2"""
     staging_df = read_from_staging(spark, "stg_driver", postgres_url, postgres_properties)
-    
+
     if staging_df.count() == 0:
         print("No driver data in staging")
         return 0
-    
+
+    # Cast date columns from string to date type
+    staging_df = staging_df.withColumn("date_of_birth", to_date(col("date_of_birth"))) \
+                           .withColumn("license_expiry", to_date(col("license_expiry")))
+
     # Add calculated columns
     staging_df = staging_df.withColumn(
         "age",
@@ -283,11 +307,16 @@ def load_dim_driver(spark, postgres_url, postgres_properties):
 def load_dim_vehicle(spark, postgres_url, postgres_properties):
     """Load vehicle dimension with SCD Type 2"""
     staging_df = read_from_staging(spark, "stg_vehicle", postgres_url, postgres_properties)
-    
+
     if staging_df.count() == 0:
         print("No vehicle data in staging")
         return 0
-    
+
+    # Cast date columns from string to date type
+    staging_df = staging_df.withColumn("last_service_date", to_date(col("last_service_date"))) \
+                           .withColumn("next_service_date", to_date(col("next_service_date"))) \
+                           .withColumn("insurance_expiry", to_date(col("insurance_expiry")))
+
     # Add calculated columns
     staging_df = staging_df.withColumn(
         "vehicle_age",
