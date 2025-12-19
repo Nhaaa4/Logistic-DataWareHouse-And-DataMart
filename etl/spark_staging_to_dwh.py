@@ -8,7 +8,6 @@ from pyspark.sql.functions import (
 )
 from pyspark.sql.window import Window
 import pyspark.sql.functions as F
-import psycopg2
 import sys
 from datetime import datetime
 
@@ -29,39 +28,63 @@ def get_postgres_config(host, port, database, user, password):
     }
     return postgres_url, postgres_properties
 
-def execute_postgres_update(postgres_url, postgres_properties, query):
-    """Execute an UPDATE query directly on PostgreSQL"""
-    # Parse connection details from JDBC URL
-    # Format: jdbc:postgresql://host:port/database
-    url_parts = postgres_url.replace("jdbc:postgresql://", "").split("/")
-    host_port = url_parts[0].split(":")
-    host = host_port[0]
-    port = host_port[1] if len(host_port) > 1 else "5432"
-    database = url_parts[1] if len(url_parts) > 1 else ""
+def expire_records_via_spark(spark, dimension_name, surrogate_key_col, keys_to_expire,
+                             postgres_url, postgres_properties):
+    """
+    Expire records using Spark by reading, updating, and overwriting.
+    This avoids using psycopg2 for UPDATE queries.
+    """
+    if not keys_to_expire:
+        return 0
 
-    conn = None
-    try:
-        conn = psycopg2.connect(
-            host=host,
-            port=port,
-            database=database,
-            user=postgres_properties["user"],
-            password=postgres_properties["password"]
-        )
-        cursor = conn.cursor()
-        cursor.execute(query)
-        affected_rows = cursor.rowcount
-        conn.commit()
-        cursor.close()
-        return affected_rows
-    except Exception as e:
-        print(f"Error executing UPDATE: {str(e)}")
-        if conn:
-            conn.rollback()
-        raise
-    finally:
-        if conn:
-            conn.close()
+    # Read all records from the dimension table
+    existing_df = spark.read.jdbc(
+        url=postgres_url,
+        table=f"dwh.{dimension_name}",
+        properties=postgres_properties
+    )
+
+    # Create a DataFrame with keys to expire
+    keys_df = spark.createDataFrame([(k,) for k in keys_to_expire], [surrogate_key_col])
+
+    # Split into records to expire and records to keep unchanged
+    records_to_expire = existing_df.join(
+        keys_df,
+        existing_df[surrogate_key_col] == keys_df[surrogate_key_col],
+        "inner"
+    ).drop(keys_df[surrogate_key_col]).filter(col("is_current") == True)
+
+    records_unchanged = existing_df.join(
+        keys_df,
+        existing_df[surrogate_key_col] == keys_df[surrogate_key_col],
+        "left_anti"
+    )
+
+    # Also keep already expired records (is_current = False) from the keys_to_expire set
+    already_expired = existing_df.join(
+        keys_df,
+        existing_df[surrogate_key_col] == keys_df[surrogate_key_col],
+        "inner"
+    ).drop(keys_df[surrogate_key_col]).filter(col("is_current") == False)
+
+    # Update the records to expire
+    expired_records = records_to_expire \
+        .withColumn("expiry_date", current_date()) \
+        .withColumn("is_current", lit(False)) \
+        .withColumn("updated_at", current_timestamp())
+
+    # Combine all records
+    final_df = records_unchanged.unionByName(expired_records).unionByName(already_expired)
+
+    # Overwrite the dimension table
+    final_df.write.jdbc(
+        url=postgres_url,
+        table=f"dwh.{dimension_name}",
+        mode="overwrite",
+        properties=postgres_properties
+    )
+
+    return expired_records.count()
 
 def read_from_staging(spark, table_name, postgres_url, postgres_properties):
     """Read data from staging table"""
@@ -218,17 +241,13 @@ def scd_type2_dimension(spark, staging_df, dimension_name, business_key,
         print(f"Creating new versions for {new_versions.count()} changed records")
 
         # Step 1: Expire old records first (before inserting new versions)
+        surrogate_key_col = f"{dimension_name.replace('dim_', '')}_key"
         if keys_list:
-            update_query = f"""
-            UPDATE dwh.{dimension_name}
-            SET expiry_date = CURRENT_DATE,
-                is_current = FALSE,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE {dimension_name.replace('dim_', '')}_key IN ({','.join(map(str, keys_list))})
-            AND is_current = TRUE
-            """
             print(f"Expiring {len(keys_list)} old records in {dimension_name}...")
-            affected_rows = execute_postgres_update(postgres_url, postgres_properties, update_query)
+            affected_rows = expire_records_via_spark(
+                spark, dimension_name, surrogate_key_col, keys_list,
+                postgres_url, postgres_properties
+            )
             print(f"Expired {affected_rows} old records")
 
         # Step 2: Insert new versions
