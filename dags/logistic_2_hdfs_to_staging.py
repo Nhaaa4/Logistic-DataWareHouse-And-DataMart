@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 OWNER_DAG = 'hadoop'
 ETL_PATH = '/home/hadoop/logistic/etl/spark_hdfs_to_postgres.py'
 HDFS_SOURCE_PATH = 'hdfs://localhost:9000/logistics'
-POSTGRES_JAR = '/home/hadoop/logistic/jdbc/postgresql-42.7.0.jar'
+POSTGRES_JAR = '/home/hadoop/logistic/jdbc/postgresql-42.6.0.jar'
 
 # PostgreSQL connection details
 POSTGRES_HOST = 'localhost'

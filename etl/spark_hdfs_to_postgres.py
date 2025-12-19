@@ -9,7 +9,7 @@ import os
 def create_spark_session(app_name="HDFS to PostgreSQL ETL"):
     return SparkSession.builder \
         .appName(app_name) \
-        .config("spark.jars", "/home/hadoop/logistic/jdbc/postgresql-42.7.0.jar") \
+        .config("spark.jars", "/home/hadoop/logistic/jdbc/postgresql-42.6.0.jar") \
         .getOrCreate()
 
 def clean_and_validate_data(df, entity_name, primary_key):
