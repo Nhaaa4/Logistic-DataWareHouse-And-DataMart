@@ -7,22 +7,24 @@ from faker import Faker
 import os
 
 fake = Faker()
-random.seed(42)
+random.seed(123)
 
-OUTPUT_DIR = "./data"
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = f"{SCRIPT_DIR}/data_sources"
 
-NUM_CUSTOMERS = 500000       
-NUM_DRIVERS = 5000         
-NUM_VEHICLES = 3000         
-NUM_ROUTES = 500            
-NUM_PACKAGES = 10000        
-NUM_WAREHOUSES = 50         
-NUM_DELIVERIES = 1000000   
+if not os.path.exists(SCRIPT_DIR):
+    os.makedirs(SCRIPT_DIR)
+
+NUM_CUSTOMERS = 50
+NUM_DRIVERS = 5         
+NUM_VEHICLES = 30         
+NUM_ROUTES = 5            
+NUM_PACKAGES = 100        
+NUM_WAREHOUSES = 5         
+NUM_DELIVERIES = 100   
 
 # Date range
-DAYS_OF_DATA = 365          # Generate 1 year of data
+DAYS_OF_DATA = 365
 START_DATE = datetime.now() - timedelta(days=DAYS_OF_DATA)
 
 PROVINCES = ["Phnom Penh", "Siem Reap", "Battambang", "Preah Sihanouk", "Kampong Cham", 
@@ -53,12 +55,10 @@ def generate_customers_csv():
             gender = random.choice(['M', 'F'])
             dob = fake.date_of_birth(minimum_age=18, maximum_age=80)
             
-            # Realistic customer growth: early adopters (20%) throughout year, majority (80%) in recent 6 months
+            # early adopters (20%) throughout year, majority (80%) in recent 6 months
             if random.random() < 0.2:
-                # Early adopters: spread across full year
                 reg_date = START_DATE + timedelta(days=random.randint(0, DAYS_OF_DATA))
             else:
-                # Recent growth: last 6 months (business expansion phase)
                 reg_date = START_DATE + timedelta(days=random.randint(DAYS_OF_DATA - 180, DAYS_OF_DATA))
             
             writer.writerow([
@@ -84,9 +84,6 @@ def generate_customers_csv():
             if i % 10000 == 0:
                 print(f"  ... {i:,}/{NUM_CUSTOMERS:,} customers")
     
-    print(f"Generated {NUM_CUSTOMERS:,} customers")
-
-
 def generate_drivers_csv():
     # Generate driver data as single CSV file
     print("Generating drivers CSV...")
@@ -104,13 +101,10 @@ def generate_drivers_csv():
             gender = random.choice(['M', 'F'])
             dob = fake.date_of_birth(minimum_age=25, maximum_age=65)
             
-            # Realistic hiring: follows customer growth lagged by 2-3 months
             # Early hires (30%) spread across first 9 months, recent hires (70%) in last 3 months
             if random.random() < 0.3:
-                # Early drivers: first 9 months
                 hire_date = START_DATE + timedelta(days=random.randint(0, 270))
             else:
-                # Recent hiring surge: last 3 months to meet demand
                 hire_date = START_DATE + timedelta(days=random.randint(DAYS_OF_DATA - 90, DAYS_OF_DATA))
             
             # License expiry: 1-5 years from hire date
@@ -133,9 +127,6 @@ def generate_drivers_csv():
                 random.choice(['Active', 'On Leave', 'Inactive']),
                 random.choice(PROVINCES)
             ])
-    
-    print(f"Generated {NUM_DRIVERS:,} drivers")
-
 
 def generate_vehicles_json():
     # Generate vehicle data as single JSON file (API response)
@@ -143,12 +134,10 @@ def generate_vehicles_json():
     
     vehicles = []
     for i in range(1, NUM_VEHICLES + 1):
-        # Realistic fleet expansion: initial fleet (40%) first 8 months, expansion (60%) last 4 months
+        # initial fleet (40%) first 8 months, expansion (60%) last 4 months
         if random.random() < 0.4:
-            # Initial fleet acquisition: first 8 months
             purchase_date = START_DATE + timedelta(days=random.randint(0, 240))
         else:
-            # Fleet expansion: last 4 months to support business growth
             purchase_date = START_DATE + timedelta(days=random.randint(DAYS_OF_DATA - 120, DAYS_OF_DATA))
         
         vehicle = {
@@ -162,7 +151,6 @@ def generate_vehicles_json():
             "capacity_volume_m3": round(random.uniform(5, 50), 2),
             "fuel_type": random.choice(FUEL_TYPES),
             "fuel_efficiency": round(random.uniform(8, 15), 2),
-            # Realistic service scheduling: last service within 3-6 months ago
             "last_service_date": (purchase_date + timedelta(days=random.randint(0, max(0, (datetime.now() - purchase_date).days - 90)))).strftime('%Y-%m-%d'),
             "next_service_date": (datetime.now() + timedelta(days=random.randint(30, 90))).strftime('%Y-%m-%d'),
             "insurance_expiry": (purchase_date + timedelta(days=365)).strftime('%Y-%m-%d'),
@@ -184,17 +172,13 @@ def generate_vehicles_json():
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(api_response, f, indent=2)
     
-    print(f"Generated {NUM_VEHICLES:,} vehicles")
-
-
 def generate_packages_json():
     # Generate package data as single JSON file
     print("Generating packages JSON...")
     
     packages = []
     for i in range(1, NUM_PACKAGES + 1):
-        # Realistic package creation: 1-7 days before use (just-in-time logistics)
-        # Most packages created recently (weighted towards end of period)
+        # 1-7 days before use (just-in-time logistics)
         created_date = START_DATE + timedelta(days=random.randint(max(0, DAYS_OF_DATA - 7), DAYS_OF_DATA))
         length = round(random.uniform(10, 100), 2)
         width = round(random.uniform(10, 80), 2)
@@ -221,21 +205,14 @@ def generate_packages_json():
     filename = os.path.join(SCRIPT_DIR, "packages.json")
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump({"packages": packages, "total": NUM_PACKAGES}, f, indent=2)
-    
-    print(f"Generated {NUM_PACKAGES:,} packages")
 
-
-def generate_routes_database():
+def generate_routes_database(cursor, conn):
     # Generate route data in SQLite database
     print("Generating routes in database...")
     
-    db_path = os.path.join(SCRIPT_DIR, "logistics_source.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    # Create routes table
+    cursor.execute('DROP TABLE IF EXISTS routes')
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS routes (
+        CREATE TABLE routes (
             route_id TEXT PRIMARY KEY,
             origin_country TEXT,
             origin_province TEXT,
@@ -271,16 +248,14 @@ def generate_routes_database():
         ))
     
     conn.commit()
-    print(f"Generated {NUM_ROUTES} routes in database")
-    return cursor, conn
-
 
 def generate_warehouses_database(cursor, conn):
     # Generate warehouse data in SQLite database
     print("Generating warehouses in database...")
     
+    cursor.execute('DROP TABLE IF EXISTS warehouses')
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS warehouses (
+        CREATE TABLE warehouses (
             warehouse_id TEXT PRIMARY KEY,
             warehouse_name TEXT,
             province TEXT,
@@ -307,15 +282,14 @@ def generate_warehouses_database(cursor, conn):
         ))
     
     conn.commit()
-    print(f"Generated {NUM_WAREHOUSES} warehouses in database")
-
 
 def generate_deliveries_database(cursor, conn):
     # Generate delivery fact data in same database
-    print("Generating deliveries in database (this will take a while)...")
+    print("Generating deliveries in database...")
     
+    cursor.execute('DROP TABLE IF EXISTS deliveries')
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS deliveries (
+        CREATE TABLE deliveries (
             delivery_id TEXT PRIMARY KEY,
             customer_id TEXT,
             driver_id TEXT,
@@ -344,17 +318,15 @@ def generate_deliveries_database(cursor, conn):
         )
     ''')
     
-    print(f"Generating {NUM_DELIVERIES:,} deliveries...")
-    
     for i in range(1, NUM_DELIVERIES + 1):
-        # Generate realistic business day (Monday-Saturday, excluding 10% for Sundays)
+        # Business day (Monday-Saturday, excluding 10% for Sundays)
         pickup_date = START_DATE + timedelta(days=random.randint(0, DAYS_OF_DATA))
-        while pickup_date.weekday() == 6 and random.random() < 0.9:  # Avoid most Sundays
+        while pickup_date.weekday() == 6 and random.random() < 0.9: 
             pickup_date = START_DATE + timedelta(days=random.randint(0, DAYS_OF_DATA))
         
-        # Realistic pickup time: 6 AM to 6 PM (business hours), weighted towards morning
-        hour_weights = [1]*6 + [3]*6 + [2]*6 + [1]*6 + [0]*6  # 6AM-6PM peak 6AM-12PM
-        pickup_hour = random.choices(range(24), weights=hour_weights + [0]*6)[0]
+        # 24 hours = 0-6AM:none(0), 6AM-12PM:peak(3), 12PM-6PM:med(2), 6PM-12AM:low(1)
+        hour_weights = [0]*6 + [3]*6 + [2]*6 + [1]*6
+        pickup_hour = random.choices(range(24), weights=hour_weights)[0]
         
         pickup_time = pickup_date.replace(
             hour=pickup_hour,
@@ -362,10 +334,10 @@ def generate_deliveries_database(cursor, conn):
             second=random.randint(0, 59)
         )
         
-        # Realistic preparation time at warehouse: 15-45 minutes
+        # Preparation time at warehouse: 15-45 minutes
         departure_time = pickup_time + timedelta(minutes=random.randint(15, 45))
         
-        # Calculate realistic travel time based on distance
+        # Calculate travel time based on distance
         distance = round(random.uniform(10, 500), 2)
         
         # Speed varies: urban (20-40 km/h), highway (60-80 km/h)
@@ -382,7 +354,7 @@ def generate_deliveries_database(cursor, conn):
         
         arrival_time = departure_time + timedelta(minutes=travel_minutes)
         
-        # Realistic delivery completion time: unloading, verification, signature
+        # Delivery completion time: unloading, verification, signature
         # On-time: 5-20 minutes, Delayed: 20-90 minutes (waiting, issues)
         on_time = random.random() > 0.15  # 85% on-time delivery rate
         if on_time:
@@ -445,8 +417,6 @@ def generate_deliveries_database(cursor, conn):
             print(f"  ... {i:,}/{NUM_DELIVERIES:,} deliveries")
     
     conn.commit()
-    print(f"Generated {NUM_DELIVERIES:,} deliveries")
-
 
 def get_directory_size(path):
     # Calculate total size of directory in bytes
@@ -470,20 +440,6 @@ def format_size(bytes):
 
 def main():
     # Main function to generate all full load data sources
-    print("=" * 80)
-    print("LOGISTICS DATA WAREHOUSE - FULL LOAD DATA GENERATOR (~1GB)")
-    print("=" * 80)
-    print(f"\nConfiguration:")
-    print(f"  Customers:     {NUM_CUSTOMERS:,}")
-    print(f"  Drivers:       {NUM_DRIVERS:,}")
-    print(f"  Vehicles:      {NUM_VEHICLES:,}")
-    print(f"  Routes:        {NUM_ROUTES:,}")
-    print(f"  Packages:      {NUM_PACKAGES:,}")
-    print(f"  Warehouses:    {NUM_WAREHOUSES:,}")
-    print(f"  Deliveries:    {NUM_DELIVERIES:,}")
-    print(f"  Time Range:    {DAYS_OF_DATA} days ({START_DATE.strftime('%Y-%m-%d')} to {datetime.now().strftime('%Y-%m-%d')})")
-    print()
-    
     start_time = datetime.now()
     
     # CSV sources
@@ -500,7 +456,10 @@ def main():
     
     # Database sources
     print("Generating database files...")
-    cursor, conn = generate_routes_database()
+    db_path = os.path.join(SCRIPT_DIR, "logistics_source.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    generate_routes_database(cursor, conn)
     generate_warehouses_database(cursor, conn)
     generate_deliveries_database(cursor, conn)
     conn.close()
@@ -510,7 +469,7 @@ def main():
     duration = (end_time - start_time).total_seconds()
     
     # Calculate total size
-    total_size = get_directory_size(OUTPUT_DIR)
+    total_size = get_directory_size(SCRIPT_DIR)
     
     print("=" * 80)
     print("FULL LOAD DATA GENERATION COMPLETE!")
@@ -518,7 +477,7 @@ def main():
     print(f"\nGeneration time: {duration:.1f} seconds ({duration/60:.1f} minutes)")
     print(f"Total data size: {format_size(total_size)}")
     print()
-    print(f"Generated files in data/ directory:")
+    print(f"Generated files in {SCRIPT_DIR} directory:")
     print(f"  customers.csv           - {NUM_CUSTOMERS:,} customer records")
     print(f"  drivers.csv             - {NUM_DRIVERS:,} driver records")
     print(f"  vehicles_api.json       - {NUM_VEHICLES:,} vehicle records (API response)")
@@ -528,14 +487,6 @@ def main():
     print(f"     - warehouses table      ({NUM_WAREHOUSES:,} records)")
     print(f"     - deliveries table      ({NUM_DELIVERIES:,} records)")
     print()
-    print("Full Load ETL Strategy:")
-    print("  1. Extract CSV files (customers, drivers)")
-    print("  2. Extract JSON/API files (vehicles, packages)")
-    print("  3. Extract database tables (routes, warehouses, deliveries)")
-    print("  4. Transform and load all data into data warehouse")
-    print()
-    print("Ready for full load ETL pipeline!")
-
 
 if __name__ == "__main__":
     main()

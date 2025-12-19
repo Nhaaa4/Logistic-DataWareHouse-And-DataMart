@@ -1,23 +1,19 @@
-"""
-Spark Job: Ingest JSON Sources to Hive
-=======================================
-Ingests vehicles and packages JSON files into Hive staging tables
-"""
+#!/usr/bin/env python3
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import current_timestamp, lit, explode, col
-import argparse
+import sys
 import os
 
 def create_spark_session(app_name="JSON Ingestion"):
-    """Create Spark session with Hive support"""
+    """Create Spark session"""
     return SparkSession.builder \
         .appName(app_name) \
-        .enableHiveSupport() \
+        .config("spark.sql.sources.partitionOverwriteMode", "dynamic") \
         .getOrCreate()
 
-def ingest_vehicles(spark, data_path, hive_db):
-    """Ingest vehicles JSON (API format) to Hive"""
+def ingest_vehicles(spark, data_path, hdfs_output_path, execution_date):
+    """Ingest vehicles JSON (API format) to HDFS"""
     print("Ingesting vehicles from JSON API...")
     
     vehicles_path = os.path.join(data_path, "vehicles_api.json")
@@ -31,18 +27,21 @@ def ingest_vehicles(spark, data_path, hive_db):
     
     # Add metadata columns
     df = df.withColumn("ingestion_timestamp", current_timestamp()) \
-           .withColumn("source_system", lit("API_JSON"))
+           .withColumn("source_system", lit("API_JSON")) \
+           .withColumn("ingestion_date", lit(execution_date))
     
-    # Write to Hive staging table
-    df.write.mode("overwrite") \
-        .format("parquet") \
-        .saveAsTable(f"{hive_db}.stg_vehicles")
+    # Write to HDFS as Parquet with partition
+    output_path = f"{hdfs_output_path}/vehicles"
+    df.write \
+        .mode("overwrite") \
+        .partitionBy("ingestion_date") \
+        .parquet(output_path)
     
-    print(f"Ingested {df.count():,} vehicle records")
+    print(f"Ingested {df.count():,} vehicle records to HDFS: {output_path}")
     return df.count()
 
-def ingest_packages(spark, data_path, hive_db):
-    """Ingest packages JSON to Hive"""
+def ingest_packages(spark, data_path, hdfs_output_path, execution_date):
+    """Ingest packages JSON to HDFS"""
     print("Ingesting packages from JSON...")
     
     packages_path = os.path.join(data_path, "packages.json")
@@ -56,39 +55,42 @@ def ingest_packages(spark, data_path, hive_db):
     
     # Add metadata columns
     df = df.withColumn("ingestion_timestamp", current_timestamp()) \
-           .withColumn("source_system", lit("JSON"))
+           .withColumn("source_system", lit("JSON")) \
+           .withColumn("ingestion_date", lit(execution_date))
     
-    # Write to Hive staging table
-    df.write.mode("overwrite") \
-        .format("parquet") \
-        .saveAsTable(f"{hive_db}.stg_packages")
+    # Write to HDFS as Parquet with partition
+    output_path = f"{hdfs_output_path}/packages"
+    df.write \
+        .mode("overwrite") \
+        .partitionBy("ingestion_date") \
+        .parquet(output_path)
     
-    print(f"Ingested {df.count():,} package records")
+    print(f"Ingested {df.count():,} package records to HDFS: {output_path}")
     return df.count()
 
 def main():
     """Main execution"""
-    parser = argparse.ArgumentParser(description='Ingest JSON sources to Hive')
-    parser.add_argument('--data-path', required=True, help='Path to data directory')
-    parser.add_argument('--hive-db', required=True, help='Hive database name')
-    args = parser.parse_args()
+    # Get values from command-line arguments
+    execution_date = sys.argv[1] if len(sys.argv) > 1 else None
+    run_id = sys.argv[2] if len(sys.argv) > 2 else None
+    DATA_PATH = sys.argv[3] if len(sys.argv) > 3 else "D:/Y3T1/Data Engineering/Logistic Data Warehouse/data/data_sources"
+    HDFS_OUTPUT_PATH = sys.argv[4] if len(sys.argv) > 4 else f"/logistics/raw/json/{execution_date}"
     
     # Create Spark session
     spark = create_spark_session("Logistics JSON Ingestion")
     
     try:
-        # Create database if not exists
-        spark.sql(f"CREATE DATABASE IF NOT EXISTS {args.hive_db}")
-        
         # Ingest sources
-        vehicle_count = ingest_vehicles(spark, args.data_path, args.hive_db)
-        package_count = ingest_packages(spark, args.data_path, args.hive_db)
+        vehicle_count = ingest_vehicles(spark, DATA_PATH, HDFS_OUTPUT_PATH, execution_date)
+        package_count = ingest_packages(spark, DATA_PATH, HDFS_OUTPUT_PATH, execution_date)
         
         print("\n" + "="*60)
-        print("JSON INGESTION COMPLETED")
+        print("JSON INGESTION COMPLETED → HDFS")
         print("="*60)
         print(f"Vehicles ingested: {vehicle_count:,}")
         print(f"Packages ingested: {package_count:,}")
+        print(f"HDFS Path: {HDFS_OUTPUT_PATH}")
+        print(f"Partition Date: {execution_date}")
         print("="*60)
         
     except Exception as e:
