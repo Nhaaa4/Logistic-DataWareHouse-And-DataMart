@@ -2,21 +2,20 @@
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import current_timestamp, lit
+from pyspark.sql.functions import trim, upper, lower, regexp_replace, col, when, length
 import sys
 import os
 
 def create_spark_session(app_name="HDFS to PostgreSQL ETL"):
-    """Create Spark session with PostgreSQL JDBC driver"""
     return SparkSession.builder \
         .appName(app_name) \
         .config("spark.jars", "/home/hadoop/logistic/jdbc/postgresql-42.7.0.jar") \
         .getOrCreate()
 
 def clean_and_validate_data(df, entity_name, primary_key):
-    """Clean and validate data before loading"""
-    from pyspark.sql.functions import trim, upper, lower, regexp_replace, col, when, length
     
     initial_count = df.count()
+    print("=" * 60)
     print(f"  Initial records: {initial_count:,}")
     
     # 1. Remove records with NULL primary keys
@@ -61,11 +60,11 @@ def clean_and_validate_data(df, entity_name, primary_key):
     final_count = df_clean.count()
     print(f"  Final records: {final_count:,}")
     print(f"  Data quality: {(final_count/initial_count*100):.2f}% retained")
+    print("=" * 60)
     
     return df_clean
 
 def load_to_postgres(df, table_name, postgres_url, postgres_properties, mode="append"):
-    """Load DataFrame to PostgreSQL staging table"""
     df.write \
         .jdbc(url=postgres_url, 
               table=table_name, 
@@ -75,20 +74,9 @@ def load_to_postgres(df, table_name, postgres_url, postgres_properties, mode="ap
     print(f"Loaded {df.count():,} records to {table_name}")
     return df.count()
 
-def truncate_staging_table(spark, postgres_url, postgres_properties, table_name):
-    try:
-        spark.read.jdbc(
-            url=postgres_url,
-            table=f"(SELECT staging.truncate_all_staging_tables()) as tmp",
-            properties=postgres_properties
-        ).collect()
-        print(f"Staging tables truncated successfully")
-    except Exception as e:
-        print(f"Warning: Could not truncate tables: {e}")
-
 def etl_customers(spark, hdfs_path, postgres_url, postgres_properties, execution_date):
-    # Read from HDFS
-    customers_path = f"{hdfs_path}/customers"
+    # Read from HDFS - ONLY today's partition
+    customers_path = f"{hdfs_path}/customers/ingestion_date={execution_date}"
     df = spark.read.parquet(customers_path)
     
     # Transform: Select and rename columns for staging
@@ -119,13 +107,13 @@ def etl_customers(spark, hdfs_path, postgres_url, postgres_properties, execution
     
     # Load to PostgreSQL staging
     count = load_to_postgres(df_clean, "staging.stg_customer", 
-                             postgres_url, postgres_properties, mode="append")
+                             postgres_url, postgres_properties, mode="overwrite")
     
     return count
 
 def etl_drivers(spark, hdfs_path, postgres_url, postgres_properties, execution_date):
-    # Read from HDFS
-    drivers_path = f"{hdfs_path}/drivers"
+    # Read from HDFS - ONLY today's partition
+    drivers_path = f"{hdfs_path}/drivers/ingestion_date={execution_date}"
     df = spark.read.parquet(drivers_path)
     
     # Transform: Select and rename columns for staging
@@ -154,13 +142,13 @@ def etl_drivers(spark, hdfs_path, postgres_url, postgres_properties, execution_d
     
     # Load to PostgreSQL staging
     count = load_to_postgres(df_clean, "staging.stg_driver", 
-                             postgres_url, postgres_properties, mode="append")
+                             postgres_url, postgres_properties, mode="overwrite")
     
     return count
 
 def etl_vehicles(spark, hdfs_path, postgres_url, postgres_properties, execution_date):
-    # Read from HDFS
-    vehicles_path = f"{hdfs_path}/vehicles"
+    # Read from HDFS - ONLY today's partition
+    vehicles_path = f"{hdfs_path}/vehicles/ingestion_date={execution_date}"
     df = spark.read.parquet(vehicles_path)
     
     # Transform: Select and rename columns for staging
@@ -189,13 +177,13 @@ def etl_vehicles(spark, hdfs_path, postgres_url, postgres_properties, execution_
     
     # Load to PostgreSQL staging
     count = load_to_postgres(df_clean, "staging.stg_vehicle", 
-                             postgres_url, postgres_properties, mode="append")
+                             postgres_url, postgres_properties, mode="overwrite")
     
     return count
 
 def etl_packages(spark, hdfs_path, postgres_url, postgres_properties, execution_date):
-    # Read from HDFS
-    packages_path = f"{hdfs_path}/packages"
+    # Read from HDFS - ONLY today's partition
+    packages_path = f"{hdfs_path}/packages/ingestion_date={execution_date}"
     df = spark.read.parquet(packages_path)
     
     # Transform: Select and rename columns for staging
@@ -221,13 +209,13 @@ def etl_packages(spark, hdfs_path, postgres_url, postgres_properties, execution_
     
     # Load to PostgreSQL staging
     count = load_to_postgres(df_clean, "staging.stg_package", 
-                             postgres_url, postgres_properties, mode="append")
+                             postgres_url, postgres_properties, mode="overwrite")
     
     return count
 
-def etl_routes(spark, hdfs_path, postgres_url, postgres_properties, execution_date):    
-    # Read from HDFS
-    routes_path = f"{hdfs_path}/routes"
+def etl_routes(spark, hdfs_path, postgres_url, postgres_properties, execution_date):
+    # Read from HDFS - ONLY today's partition
+    routes_path = f"{hdfs_path}/routes/ingestion_date={execution_date}"
     df = spark.read.parquet(routes_path)
     
     # Transform: Select and rename columns for staging
@@ -252,13 +240,13 @@ def etl_routes(spark, hdfs_path, postgres_url, postgres_properties, execution_da
     
     # Load to PostgreSQL staging
     count = load_to_postgres(df_clean, "staging.stg_route", 
-                             postgres_url, postgres_properties, mode="append")
+                             postgres_url, postgres_properties, mode="overwrite")
     
     return count
 
 def etl_warehouses(spark, hdfs_path, postgres_url, postgres_properties, execution_date):
-    # Read from HDFS
-    warehouses_path = f"{hdfs_path}/warehouses"
+    # Read from HDFS - ONLY today's partition
+    warehouses_path = f"{hdfs_path}/warehouses/ingestion_date={execution_date}"
     df = spark.read.parquet(warehouses_path)
     
     # Transform: Select and rename columns for staging
@@ -280,13 +268,13 @@ def etl_warehouses(spark, hdfs_path, postgres_url, postgres_properties, executio
     
     # Load to PostgreSQL staging
     count = load_to_postgres(df_clean, "staging.stg_warehouse", 
-                             postgres_url, postgres_properties, mode="append")
+                             postgres_url, postgres_properties, mode="overwrite")
     
     return count
 
 def etl_deliveries(spark, hdfs_path, postgres_url, postgres_properties, execution_date):
-    # Read from HDFS
-    deliveries_path = f"{hdfs_path}/deliveries"
+    # Read from HDFS - ONLY today's partition
+    deliveries_path = f"{hdfs_path}/deliveries/ingestion_date={execution_date}"
     df = spark.read.parquet(deliveries_path)
     
     # Transform: Select and rename columns for staging
@@ -324,7 +312,7 @@ def etl_deliveries(spark, hdfs_path, postgres_url, postgres_properties, executio
     
     # Load to PostgreSQL staging
     count = load_to_postgres(df_clean, "staging.stg_delivery", 
-                             postgres_url, postgres_properties, mode="append")
+                             postgres_url, postgres_properties, mode="overwrite")
     
     return count
 

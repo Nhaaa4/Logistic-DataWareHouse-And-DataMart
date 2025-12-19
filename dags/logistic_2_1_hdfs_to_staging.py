@@ -2,8 +2,6 @@
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator
-from airflow.providers.postgres.operators.postgres import PostgresOperator
 from datetime import datetime, timedelta
 
 # CONFIGURATION
@@ -17,7 +15,7 @@ POSTGRES_HOST = 'localhost'
 POSTGRES_PORT = '5432'
 POSTGRES_DB = 'logistics_dwh'
 POSTGRES_USER = 'postgres'
-POSTGRES_PASSWORD = 'postgres'
+POSTGRES_PASSWORD = '172839'
 
 default_args = {
     'owner': OWNER_DAG,
@@ -38,11 +36,8 @@ dag = DAG(
 
 spark_command = f"""
 spark-submit \\
---master local[4] \\
---driver-memory 2g \\
---executor-memory 2g \\
+--master local[2] \\
 --jars "{POSTGRES_JAR}" \\
---conf spark.sql.shuffle.partitions=8 \\
 "{ETL_PATH}" \\
 "{HDFS_SOURCE_PATH}" \\
 "{POSTGRES_HOST}" \\
