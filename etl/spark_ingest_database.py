@@ -6,20 +6,16 @@ import sys
 import os
 
 def create_spark_session(app_name="Database Ingestion"):
-    """Create Spark session"""
     return SparkSession.builder \
         .appName(app_name) \
         .config("spark.sql.sources.partitionOverwriteMode", "dynamic") \
         .getOrCreate()
 
 def ingest_routes(spark, db_path, hdfs_output_path, execution_date):
-    """Ingest routes from SQLite to HDFS"""
-    print("Ingesting routes from SQLite...")
-    
     # Read from SQLite
     df = spark.read \
         .format("jdbc") \
-        .option("url", f"jdbc:sqlite:{db_path}") \
+        .option("url", f"{db_path}") \
         .option("dbtable", "routes") \
         .option("driver", "org.sqlite.JDBC") \
         .load()
@@ -39,14 +35,11 @@ def ingest_routes(spark, db_path, hdfs_output_path, execution_date):
     print(f"Ingested {df.count():,} route records to HDFS: {output_path}")
     return df.count()
 
-def ingest_warehouses(spark, db_path, hdfs_output_path, execution_date):
-    """Ingest warehouses from SQLite to HDFS"""
-    print("Ingesting warehouses from SQLite...")
-    
+def ingest_warehouses(spark, db_path, hdfs_output_path, execution_date):    
     # Read from SQLite
     df = spark.read \
         .format("jdbc") \
-        .option("url", f"jdbc:sqlite:{db_path}") \
+        .option("url", f"{db_path}") \
         .option("dbtable", "warehouses") \
         .option("driver", "org.sqlite.JDBC") \
         .load()
@@ -67,9 +60,6 @@ def ingest_warehouses(spark, db_path, hdfs_output_path, execution_date):
     return df.count()
 
 def ingest_deliveries(spark, db_path, hdfs_output_path, execution_date):
-    """Ingest deliveries from SQLite to HDFS"""
-    print("Ingesting deliveries from SQLite...")
-    
     # Read from SQLite
     df = spark.read \
         .format("jdbc") \
@@ -94,29 +84,25 @@ def ingest_deliveries(spark, db_path, hdfs_output_path, execution_date):
     return df.count()
 
 def main():
-    """Main execution"""
     # Get values from command-line arguments
-    DATA_PATH = sys.argv[1] if len(sys.argv) > 1 else "data/data_sources"
-    HDFS_OUTPUT_PATH = sys.argv[2] if len(sys.argv) > 2 else "hdfs://localhost:9000/logistics/raw/db"
+    DATA_PATH = sys.argv[1] 
+    HDFS_OUTPUT_PATH = sys.argv[2]
     
     # Generate execution date
     from datetime import datetime
     execution_date = datetime.now().strftime("%Y-%m-%d")
-    
-    DB_PATH = os.path.join(DATA_PATH, "logistics_source.db")
     
     # Create Spark session
     spark = create_spark_session("Logistics Database Ingestion")
     
     try:
         # Ingest sources
-        route_count = ingest_routes(spark, DB_PATH, HDFS_OUTPUT_PATH, execution_date)
-        warehouse_count = ingest_warehouses(spark, DB_PATH, HDFS_OUTPUT_PATH, execution_date)
-        delivery_count = ingest_deliveries(spark, DB_PATH, HDFS_OUTPUT_PATH, execution_date)
+        route_count = ingest_routes(spark, DATA_PATH, HDFS_OUTPUT_PATH, execution_date)
+        warehouse_count = ingest_warehouses(spark, DATA_PATH, HDFS_OUTPUT_PATH, execution_date)
+        delivery_count = ingest_deliveries(spark, DATA_PATH, HDFS_OUTPUT_PATH, execution_date)
         
         print("\n" + "="*60)
-        print("DATABASE INGESTION COMPLETED → HDFS")
-        print("="*60)
+        print("DATABASE to HDFS Complete:")
         print(f"Routes ingested:      {route_count:>10,}")
         print(f"Warehouses ingested:  {warehouse_count:>10,}")
         print(f"Deliveries ingested:  {delivery_count:>10,}")

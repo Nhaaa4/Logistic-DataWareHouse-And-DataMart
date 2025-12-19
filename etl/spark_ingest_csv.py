@@ -13,7 +13,7 @@ def create_spark_session(app_name="CSV Ingestion"):
         .getOrCreate()
 
 def ingest_customers(spark, data_path, hdfs_output_path, execution_date):
-    customers_path = os.path.join(data_path, "customers.csv")
+    customers_path = f"{data_path}/customers.csv"
     
     # Read CSV
     df = spark.read.format("csv") \
@@ -37,7 +37,7 @@ def ingest_customers(spark, data_path, hdfs_output_path, execution_date):
     return df.count()
 
 def ingest_drivers(spark, data_path, hdfs_output_path, execution_date):
-    drivers_path = os.path.join(data_path, "drivers.csv")
+    drivers_path = f"{data_path}/drivers.csv"
     
     # Read CSV
     df = spark.read.format("csv") \
@@ -61,10 +61,9 @@ def ingest_drivers(spark, data_path, hdfs_output_path, execution_date):
     return df.count()
 
 def main():
-    """Main execution"""
     # Get values from command-line arguments
-    DATA_PATH = sys.argv[1] if len(sys.argv) > 1 else "data/data_sources"
-    HDFS_OUTPUT_PATH = sys.argv[2] if len(sys.argv) > 2 else "hdfs://localhost:9000/logistics/raw/csv"
+    DATA_PATH = sys.argv[1]
+    HDFS_OUTPUT_PATH = sys.argv[2]
     
     # Generate execution date
     from datetime import datetime

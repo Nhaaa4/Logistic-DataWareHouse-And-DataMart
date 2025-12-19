@@ -7,8 +7,8 @@ from datetime import datetime, timedelta
 # Configuration
 OWNER_DAG = 'hadoop'
 ETL_PATH = '/home/hadoop/logistic/etl/spark_ingest_database.py'
-DATA_SOURCE_PATH = '/home/hadoop/logistic/data/data_sources'
-HDFS_TARGET_PATH = 'localhost:9000/logistics'
+DATA_SOURCE_PATH = 'jdbc:sqlite:file:///home/hadoop/logistic/data/data_sources/logistics_source.db'
+HDFS_TARGET_PATH = 'hdfs://localhost:9000/logistics'
 JARS_PATH = '/home/hadoop/logistic/jdbc/sqlite-jdbc-3.51.1.0.jar'
 
 default_args = {
@@ -29,7 +29,7 @@ dag = DAG(
 
 spark_command = f"""
 spark-submit \\
---master local[*] \\
+--master local[2] \\
 --jars "{JARS_PATH}" \\
 "{ETL_PATH}" \\
 "{DATA_SOURCE_PATH}" \\

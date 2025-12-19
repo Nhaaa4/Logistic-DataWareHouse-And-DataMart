@@ -7,8 +7,8 @@ from datetime import datetime, timedelta
 # Configuration
 OWNER_DAG = 'hadoop'
 ETL_PATH = '/home/hadoop/logistic/etl/spark_ingest_json.py'
-DATA_SOURCE_PATH = '/home/hadoop/logistic/data/data_sources'
-HDFS_TARGET_PATH = 'localhost:9000/logistics'
+DATA_SOURCE_PATH = 'file:///home/hadoop/logistic/data/data_sources'
+HDFS_TARGET_PATH = 'hdfs://localhost:9000/logistics'
 
 default_args = {
     'owner': OWNER_DAG,
@@ -28,7 +28,7 @@ dag = DAG(
 
 spark_command = f"""
 spark-submit \\
---master local[*] \\
+--master local[2] \\
 "{ETL_PATH}" \\
 "{DATA_SOURCE_PATH}" \\
 "{HDFS_TARGET_PATH}"

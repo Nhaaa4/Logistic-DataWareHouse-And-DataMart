@@ -6,17 +6,13 @@ import sys
 import os
 
 def create_spark_session(app_name="JSON Ingestion"):
-    """Create Spark session"""
     return SparkSession.builder \
         .appName(app_name) \
         .config("spark.sql.sources.partitionOverwriteMode", "dynamic") \
         .getOrCreate()
 
 def ingest_vehicles(spark, data_path, hdfs_output_path, execution_date):
-    """Ingest vehicles JSON (API format) to HDFS"""
-    print("Ingesting vehicles from JSON API...")
-    
-    vehicles_path = os.path.join(data_path, "vehicles_api.json")
+    vehicles_path = f"{data_path}/vehicles_api.json"
     
     # Read JSON (API response format)
     df_raw = spark.read.json(vehicles_path)
@@ -41,10 +37,7 @@ def ingest_vehicles(spark, data_path, hdfs_output_path, execution_date):
     return df.count()
 
 def ingest_packages(spark, data_path, hdfs_output_path, execution_date):
-    """Ingest packages JSON to HDFS"""
-    print("Ingesting packages from JSON...")
-    
-    packages_path = os.path.join(data_path, "packages.json")
+    packages_path = f"{data_path}/packages.json"
     
     # Read JSON
     df_raw = spark.read.json(packages_path)
@@ -70,9 +63,8 @@ def ingest_packages(spark, data_path, hdfs_output_path, execution_date):
 
 def main():
     """Main execution"""
-    # Get values from command-line arguments
-    DATA_PATH = sys.argv[1] if len(sys.argv) > 1 else "data/data_sources"
-    HDFS_OUTPUT_PATH = sys.argv[2] if len(sys.argv) > 2 else "hdfs://localhost:9000/logistics/raw/json"
+    DATA_PATH = sys.argv[1]
+    HDFS_OUTPUT_PATH = sys.argv[2]
     
     # Generate execution date
     from datetime import datetime
@@ -87,8 +79,7 @@ def main():
         package_count = ingest_packages(spark, DATA_PATH, HDFS_OUTPUT_PATH, execution_date)
         
         print("\n" + "="*60)
-        print("JSON INGESTION COMPLETED → HDFS")
-        print("="*60)
+        print("JSON to HDFS Complete:")
         print(f"Vehicles ingested: {vehicle_count:,}")
         print(f"Packages ingested: {package_count:,}")
         print(f"HDFS Path: {HDFS_OUTPUT_PATH}")
