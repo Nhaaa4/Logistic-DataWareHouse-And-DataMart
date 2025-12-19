@@ -15,7 +15,7 @@ def ingest_routes(spark, db_path, hdfs_output_path, execution_date):
     # Read from SQLite
     df = spark.read \
         .format("jdbc") \
-        .option("url", f"{db_path}") \
+        .option("url", f"{db_path}?date_string_format=yyyy-MM-dd") \
         .option("dbtable", "routes") \
         .option("driver", "org.sqlite.JDBC") \
         .load()
@@ -39,7 +39,7 @@ def ingest_warehouses(spark, db_path, hdfs_output_path, execution_date):
     # Read from SQLite
     df = spark.read \
         .format("jdbc") \
-        .option("url", f"{db_path}") \
+        .option("url", f"{db_path}?date_string_format=yyyy-MM-dd") \
         .option("dbtable", "warehouses") \
         .option("driver", "org.sqlite.JDBC") \
         .load()
@@ -63,7 +63,7 @@ def ingest_deliveries(spark, db_path, hdfs_output_path, execution_date):
     # Read from SQLite
     df = spark.read \
         .format("jdbc") \
-        .option("url", f"jdbc:sqlite:{db_path}") \
+        .option("url", f"{db_path}?date_string_format=yyyy-MM-dd") \
         .option("dbtable", "deliveries") \
         .option("driver", "org.sqlite.JDBC") \
         .load()
