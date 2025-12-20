@@ -4,9 +4,7 @@ A modern data engineering infrastructure for logistics and delivery operations, 
 
 ## Architecture Overview
 
-```html
-<img src="./assests/etl-flow.png"/>
-```
+[!etl-flow](assests/etl-flow.png)
 
 ## Tech Stack
 
