@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" version="29.2.7">
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" version="29.2.9">
   <diagram name="Page-1" id="wqLfzaJClV8SEG3w-16H">
     <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
@@ -1806,7 +1806,7 @@
         <mxCell id="OIcpkfAPV-1-Nm3195CD-17" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Machine Learing" vertex="1">
           <mxGeometry height="30" width="60" x="1249" y="1612.76" as="geometry" />
         </mxCell>
-        <mxCell id="OIcpkfAPV-1-Nm3195CD-18" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Research" vertex="1">
+        <mxCell id="OIcpkfAPV-1-Nm3195CD-18" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Report" vertex="1">
           <mxGeometry height="30" width="60" x="1258" y="1760" as="geometry" />
         </mxCell>
       </root>

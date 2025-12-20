@@ -29,10 +29,6 @@ def get_postgres_config(host, port, database, user, password):
 
 def expire_records_via_spark(spark, dimension_name, surrogate_key_col, keys_to_expire,
                              postgres_url, postgres_properties):
-    """
-    Expire records using Spark by reading, updating, and overwriting.
-    This avoids using psycopg2 for UPDATE queries.
-    """
     if not keys_to_expire:
         return 0
 
@@ -106,20 +102,6 @@ def read_from_dwh(spark, table_name, postgres_url, postgres_properties):
 
 def scd_type2_dimension(spark, staging_df, dimension_name, business_key, 
                         postgres_url, postgres_properties, compare_columns):
-    """
-    Implement SCD Type 2 for dimension tables
-    
-    Args:
-        staging_df: DataFrame from staging
-        dimension_name: Name of dimension table (e.g., 'dim_customer')
-        business_key: Business key column (e.g., 'customer_id')
-        compare_columns: List of columns to compare for changes
-    """
-    
-    print(f"\n{'='*70}")
-    print(f"Processing SCD Type 2 for {dimension_name}")
-    print(f"{'='*70}")
-    
     # Read existing dimension
     existing_dim = read_from_dwh(spark, dimension_name, postgres_url, postgres_properties)
     
