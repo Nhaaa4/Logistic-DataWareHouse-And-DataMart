@@ -272,6 +272,9 @@ def load_dim_customer(spark, postgres_url, postgres_properties):
     # Cast date columns from string to date type
     staging_df = staging_df.withColumn("date_of_birth", to_date(col("date_of_birth")))
 
+    # Cast boolean columns
+    staging_df = staging_df.withColumn("is_active", col("is_active").cast("boolean"))
+
     # Add calculated columns
     staging_df = staging_df.withColumn(
         "age",
@@ -279,14 +282,14 @@ def load_dim_customer(spark, postgres_url, postgres_properties):
              floor(datediff(current_date(), col("date_of_birth")) / 365)
         ).otherwise(None)
     )
-    
+
     # Define columns to compare for changes (excluding metadata)
     compare_columns = [
         'customer_name', 'gender', 'date_of_birth', 'phone', 'email',
         'address', 'commune', 'district', 'province', 'country', 'postal_code',
         'customer_type', 'loyalty_level', 'preferred_contact', 'is_active'
     ]
-    
+
     return scd_type2_dimension(
         spark, staging_df, 'dim_customer', 'customer_id', 
         postgres_url, postgres_properties, compare_columns
@@ -336,6 +339,9 @@ def load_dim_vehicle(spark, postgres_url, postgres_properties):
                            .withColumn("next_service_date", to_date(col("next_service_date"))) \
                            .withColumn("insurance_expiry", to_date(col("insurance_expiry")))
 
+    # Cast boolean columns
+    staging_df = staging_df.withColumn("gps_installed", col("gps_installed").cast("boolean"))
+
     # Add calculated columns
     staging_df = staging_df.withColumn(
         "vehicle_age",
@@ -343,14 +349,14 @@ def load_dim_vehicle(spark, postgres_url, postgres_properties):
              year(current_date()) - col("manufacture_year")
         ).otherwise(None)
     )
-    
+
     compare_columns = [
         'plate_number', 'vehicle_type', 'brand', 'model', 'manufacture_year',
         'capacity_kg', 'capacity_volume_m3', 'fuel_type', 'fuel_efficiency',
-        'last_service_date', 'next_service_date', 'insurance_expiry', 
+        'last_service_date', 'next_service_date', 'insurance_expiry',
         'gps_installed', 'status'
     ]
-    
+
     return scd_type2_dimension(
         spark, staging_df, 'dim_vehicle', 'vehicle_id', 
         postgres_url, postgres_properties, compare_columns
@@ -381,17 +387,22 @@ def load_dim_route(spark, postgres_url, postgres_properties):
 def load_dim_package(spark, postgres_url, postgres_properties):
     """Load package dimension with SCD Type 2"""
     staging_df = read_from_staging(spark, "stg_package", postgres_url, postgres_properties)
-    
+
     if staging_df.count() == 0:
         print("No package data in staging")
         return 0
-    
+
+    # Cast boolean columns
+    staging_df = staging_df.withColumn("fragile", col("fragile").cast("boolean")) \
+                           .withColumn("hazardous", col("hazardous").cast("boolean")) \
+                           .withColumn("temperature_control", col("temperature_control").cast("boolean"))
+
     compare_columns = [
         'package_type', 'weight_kg', 'length_cm', 'width_cm', 'height_cm',
         'volume_cm3', 'size_category', 'fragile', 'hazardous',
         'temperature_control', 'insurance_value'
     ]
-    
+
     return scd_type2_dimension(
         spark, staging_df, 'dim_package', 'package_id', 
         postgres_url, postgres_properties, compare_columns
@@ -550,10 +561,10 @@ def load_fact_delivery(spark, postgres_url, postgres_properties):
         col("dr.route_key"),
         col("dp.package_key"),
         col("dw.warehouse_key"),
-        col("stg.pickup_time"),
-        col("stg.departure_time"),
-        col("stg.arrival_time"),
-        col("stg.delivery_time"),
+        col("stg.pickup_time").cast("timestamp"),
+        col("stg.departure_time").cast("timestamp"),
+        col("stg.arrival_time").cast("timestamp"),
+        col("stg.delivery_time").cast("timestamp"),
         col("stg.distance_km"),
         col("stg.fuel_used_liters"),
         col("stg.base_cost"),
@@ -564,9 +575,9 @@ def load_fact_delivery(spark, postgres_url, postgres_properties):
         col("stg.payment_method"),
         col("stg.payment_status"),
         col("stg.delivery_status"),
-        col("stg.on_time_flag"),
-        col("stg.damaged_flag"),
-        col("stg.returned_flag")
+        col("stg.on_time_flag").cast("boolean"),
+        col("stg.damaged_flag").cast("boolean"),
+        col("stg.returned_flag").cast("boolean")
     ).withColumn("delivery_duration_min",
                  when((col("delivery_time").isNotNull()) & (col("departure_time").isNotNull()),
                       (unix_timestamp(col("delivery_time")) - unix_timestamp(col("departure_time"))) / 60
