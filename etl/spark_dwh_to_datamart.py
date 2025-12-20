@@ -19,7 +19,6 @@ def create_spark_session(app_name="DWH to Data Mart ETL"):
 
 
 def get_postgres_config(host, port, database, user, password):
-    """Return PostgreSQL connection configuration"""
     postgres_url = f"jdbc:postgresql://{host}:{port}/{database}"
     postgres_properties = {
         "user": user,
@@ -30,7 +29,6 @@ def get_postgres_config(host, port, database, user, password):
 
 
 def get_mysql_config(host, port, database, user, password):
-    """Return MySQL connection configuration"""
     mysql_url = f"jdbc:mysql://{host}:{port}/{database}?useSSL=false&allowPublicKeyRetrieval=true"
     mysql_properties = {
         "user": user,
@@ -41,7 +39,6 @@ def get_mysql_config(host, port, database, user, password):
 
 
 def read_from_dwh(spark, table_name, postgres_url, postgres_properties):
-    """Read data from DWH table"""
     try:
         df = spark.read.jdbc(
             url=postgres_url,
@@ -55,7 +52,6 @@ def read_from_dwh(spark, table_name, postgres_url, postgres_properties):
 
 
 def write_to_datamart(df, table_name, mysql_url, mysql_properties, mode="overwrite"):
-    """Write data to MySQL data mart"""
     df.write.jdbc(
         url=mysql_url,
         table=table_name,
@@ -65,11 +61,6 @@ def write_to_datamart(df, table_name, mysql_url, mysql_properties, mode="overwri
 
 
 def load_mart_customer_analytics(spark, postgres_url, postgres_properties, mysql_url, mysql_properties):
-    """Load customer analytics data mart"""
-    print("\n" + "="*70)
-    print("Loading mart_customer_analytics")
-    print("="*70)
-
     # Read from DWH
     dim_customer = read_from_dwh(spark, "dim_customer", postgres_url, postgres_properties)
     fact_delivery = read_from_dwh(spark, "fact_delivery", postgres_url, postgres_properties)
@@ -157,16 +148,10 @@ def load_mart_customer_analytics(spark, postgres_url, postgres_properties, mysql
     write_to_datamart(mart_df, "mart_customer_analytics", mysql_url, mysql_properties)
 
     count_result = mart_df.count()
-    print(f"Loaded {count_result} records into mart_customer_analytics")
     return count_result
 
 
 def load_mart_delivery_performance(spark, postgres_url, postgres_properties, mysql_url, mysql_properties):
-    """Load delivery performance data mart (daily aggregations)"""
-    print("\n" + "="*70)
-    print("Loading mart_delivery_performance")
-    print("="*70)
-
     # Read from DWH
     fact_delivery = read_from_dwh(spark, "fact_delivery", postgres_url, postgres_properties)
     dim_date = read_from_dwh(spark, "dim_date", postgres_url, postgres_properties)
@@ -255,16 +240,10 @@ def load_mart_delivery_performance(spark, postgres_url, postgres_properties, mys
     write_to_datamart(final_daily, "mart_delivery_performance", mysql_url, mysql_properties)
 
     count_result = final_daily.count()
-    print(f"Loaded {count_result} daily records into mart_delivery_performance")
     return count_result
 
 
 def load_mart_resource_performance(spark, postgres_url, postgres_properties, mysql_url, mysql_properties):
-    """Load resource (driver/vehicle) performance data mart"""
-    print("\n" + "="*70)
-    print("Loading mart_resource_performance")
-    print("="*70)
-
     # Read from DWH
     dim_driver = read_from_dwh(spark, "dim_driver", postgres_url, postgres_properties)
     dim_vehicle = read_from_dwh(spark, "dim_vehicle", postgres_url, postgres_properties)
@@ -383,16 +362,10 @@ def load_mart_resource_performance(spark, postgres_url, postgres_properties, mys
     write_to_datamart(all_resources, "mart_resource_performance", mysql_url, mysql_properties)
 
     count_result = all_resources.count()
-    print(f"Loaded {count_result} records into mart_resource_performance")
     return count_result
 
 
 def load_mart_financial_analytics(spark, postgres_url, postgres_properties, mysql_url, mysql_properties):
-    """Load financial analytics data mart"""
-    print("\n" + "="*70)
-    print("Loading mart_financial_analytics")
-    print("="*70)
-
     # Read from DWH
     fact_delivery = read_from_dwh(spark, "fact_delivery", postgres_url, postgres_properties)
     dim_customer = read_from_dwh(spark, "dim_customer", postgres_url, postgres_properties)
@@ -552,15 +525,10 @@ def load_mart_financial_analytics(spark, postgres_url, postgres_properties, mysq
     write_to_datamart(final_financials, "mart_financial_analytics", mysql_url, mysql_properties)
 
     count_result = final_financials.count()
-    print(f"Loaded {count_result} records into mart_financial_analytics")
     return count_result
 
 
 def main():
-    if len(sys.argv) != 11:
-        print("Usage: spark_dwh_to_datamart.py <pg_host> <pg_port> <pg_db> <pg_user> <pg_password> <mysql_host> <mysql_port> <mysql_db> <mysql_user> <mysql_password>")
-        sys.exit(1)
-
     # Get parameters
     pg_host = sys.argv[1]
     pg_port = sys.argv[2]
@@ -572,14 +540,6 @@ def main():
     mysql_db = sys.argv[8]
     mysql_user = sys.argv[9]
     mysql_password = sys.argv[10]
-
-    print("\n" + "="*70)
-    print("DWH TO DATA MART ETL")
-    print("="*70)
-    print(f"Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"PostgreSQL DWH: {pg_host}:{pg_port}/{pg_db}")
-    print(f"MySQL Data Mart: {mysql_host}:{mysql_port}/{mysql_db}")
-    print("="*70 + "\n")
 
     # Create Spark session
     spark = create_spark_session()

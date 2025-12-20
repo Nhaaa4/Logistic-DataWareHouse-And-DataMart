@@ -6,7 +6,6 @@ from pyspark.sql.functions import (
     year, datediff, coalesce, to_date, unix_timestamp,
     floor, concat_ws
 )
-from pyspark.sql.window import Window
 import pyspark.sql.functions as F
 import sys
 from datetime import datetime
@@ -637,24 +636,13 @@ def load_fact_delivery(spark, postgres_url, postgres_properties):
     print("="*70 + "\n")
     return result_count
 
-def main():
-    if len(sys.argv) != 6:
-        print("Usage: spark_staging_to_dwh.py <postgres_host> <postgres_port> <postgres_db> <postgres_user> <postgres_password>")
-        sys.exit(1)
-    
+def main():    
     # Get parameters
     postgres_host = sys.argv[1]
     postgres_port = sys.argv[2]
     postgres_db = sys.argv[3]
     postgres_user = sys.argv[4]
     postgres_password = sys.argv[5]
-    
-    print("\n" + "="*70)
-    print("STAGING TO DATA WAREHOUSE ETL - WITH SCD TYPE 2")
-    print("="*70)
-    print(f"Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"PostgreSQL: {postgres_host}:{postgres_port}/{postgres_db}")
-    print("="*70 + "\n")
     
     # Create Spark session
     spark = create_spark_session()
@@ -667,8 +655,6 @@ def main():
     
     try:
         # Load dimensions with SCD Type 2
-        print("\n### LOADING DIMENSIONS ###\n")
-        
         customer_count = load_dim_customer(spark, postgres_url, postgres_properties)
         driver_count = load_dim_driver(spark, postgres_url, postgres_properties)
         vehicle_count = load_dim_vehicle(spark, postgres_url, postgres_properties)
@@ -678,7 +664,6 @@ def main():
         date_count = load_dim_date(spark, postgres_url, postgres_properties)
         
         # Load fact table
-        print("\n### LOADING FACT TABLE ###\n")
         fact_count = load_fact_delivery(spark, postgres_url, postgres_properties)
         
         # Summary
@@ -698,10 +683,10 @@ def main():
         print(f"\nEnd Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print("="*70 + "\n")
         
-        print("✓ ETL completed successfully!")
+        print("ETL completed successfully!")
         
     except Exception as e:
-        print(f"\n✗ ETL failed with error: {str(e)}")
+        print(f"\nETL failed with error: {str(e)}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

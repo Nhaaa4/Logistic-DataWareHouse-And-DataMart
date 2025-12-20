@@ -1,15 +1,11 @@
 -- ==========================================
 -- DATA WAREHOUSE - LOGISTICS 
--- PostgreSQL Implementation
 -- ==========================================
--- Final dimensional model with SCD Type 2
 
 -- Create DWH schema
 CREATE SCHEMA IF NOT EXISTS dwh;
 
--- ==========================================
 -- DIMENSION TABLES
--- ==========================================
 
 -- DIM_DATE: Time dimension
 CREATE TABLE dwh.dim_date (
@@ -39,7 +35,7 @@ CREATE INDEX idx_dwh_dim_date_full_date ON dwh.dim_date(full_date);
 CREATE INDEX idx_dwh_dim_date_year_month ON dwh.dim_date(year, month);
 CREATE INDEX idx_dwh_dim_date_is_current ON dwh.dim_date(is_current);
 
--- DIM_CUSTOMER: Customer dimension with SCD Type 2
+-- DIM_CUSTOMER: Customer dimension
 CREATE TABLE dwh.dim_customer (
     customer_key        BIGSERIAL PRIMARY KEY,
     customer_id         VARCHAR(50) NOT NULL,
@@ -72,7 +68,7 @@ CREATE INDEX idx_dwh_dim_customer_is_current ON dwh.dim_customer(is_current);
 CREATE INDEX idx_dwh_dim_customer_province ON dwh.dim_customer(province);
 CREATE INDEX idx_dwh_dim_customer_type ON dwh.dim_customer(customer_type);
 
--- DIM_DRIVER: Driver dimension with SCD Type 2
+-- DIM_DRIVER: Driver dimension
 CREATE TABLE dwh.dim_driver (
     driver_key          BIGSERIAL PRIMARY KEY,
     driver_id           VARCHAR(50) NOT NULL,
@@ -103,7 +99,7 @@ CREATE INDEX idx_dwh_dim_driver_is_current ON dwh.dim_driver(is_current);
 CREATE INDEX idx_dwh_dim_driver_status ON dwh.dim_driver(status);
 CREATE INDEX idx_dwh_dim_driver_base_city ON dwh.dim_driver(base_city);
 
--- DIM_VEHICLE: Vehicle dimension with SCD Type 2
+-- DIM_VEHICLE: Vehicle dimension
 CREATE TABLE dwh.dim_vehicle (
     vehicle_key         BIGSERIAL PRIMARY KEY,
     vehicle_id          VARCHAR(50) NOT NULL,
@@ -134,7 +130,7 @@ CREATE INDEX idx_dwh_dim_vehicle_is_current ON dwh.dim_vehicle(is_current);
 CREATE INDEX idx_dwh_dim_vehicle_status ON dwh.dim_vehicle(status);
 CREATE INDEX idx_dwh_dim_vehicle_type ON dwh.dim_vehicle(vehicle_type);
 
--- DIM_ROUTE: Route dimension with SCD Type 2
+-- DIM_ROUTE: Route dimension
 CREATE TABLE dwh.dim_route (
     route_key           BIGSERIAL PRIMARY KEY,
     route_id            VARCHAR(50) NOT NULL,
@@ -160,7 +156,7 @@ CREATE INDEX idx_dwh_dim_route_is_current ON dwh.dim_route(is_current);
 CREATE INDEX idx_dwh_dim_route_provinces ON dwh.dim_route(origin_province, destination_province);
 CREATE INDEX idx_dwh_dim_route_region ON dwh.dim_route(region);
 
--- DIM_PACKAGE: Package dimension with SCD Type 2
+-- DIM_PACKAGE: Package dimension
 CREATE TABLE dwh.dim_package (
     package_key         BIGSERIAL PRIMARY KEY,
     package_id          VARCHAR(50) NOT NULL,
@@ -187,7 +183,7 @@ CREATE INDEX idx_dwh_dim_package_is_current ON dwh.dim_package(is_current);
 CREATE INDEX idx_dwh_dim_package_type ON dwh.dim_package(package_type);
 CREATE INDEX idx_dwh_dim_package_size ON dwh.dim_package(size_category);
 
--- DIM_WAREHOUSE: Warehouse dimension with SCD Type 2
+-- DIM_WAREHOUSE: Warehouse dimension
 CREATE TABLE dwh.dim_warehouse (
     warehouse_key       BIGSERIAL PRIMARY KEY,
     warehouse_id        VARCHAR(50) NOT NULL,
@@ -210,9 +206,7 @@ CREATE INDEX idx_dwh_dim_warehouse_is_current ON dwh.dim_warehouse(is_current);
 CREATE INDEX idx_dwh_dim_warehouse_province ON dwh.dim_warehouse(province);
 CREATE INDEX idx_dwh_dim_warehouse_status ON dwh.dim_warehouse(operational_status);
 
--- ==========================================
 -- FACT TABLE
--- ==========================================
 
 -- FACT_DELIVERY: Main delivery transactions
 CREATE TABLE dwh.fact_delivery (
@@ -256,8 +250,8 @@ CREATE TABLE dwh.fact_delivery (
     CONSTRAINT fk_fact_delivery_warehouse FOREIGN KEY (warehouse_key) REFERENCES dwh.dim_warehouse(warehouse_key)
 );
 
--- Partitioning by year and month (for PostgreSQL 11+)
--- ALTER TABLE dwh.fact_delivery PARTITION BY RANGE (year, month);
+-- Partitioning by year and month
+ALTER TABLE dwh.fact_delivery PARTITION BY RANGE (year, month);
 
 CREATE INDEX idx_dwh_fact_delivery_date ON dwh.fact_delivery(date_key);
 CREATE INDEX idx_dwh_fact_delivery_customer ON dwh.fact_delivery(customer_key);
@@ -269,14 +263,3 @@ CREATE INDEX idx_dwh_fact_delivery_payment ON dwh.fact_delivery(payment_status);
 CREATE INDEX idx_dwh_fact_delivery_id ON dwh.fact_delivery(delivery_id);
 CREATE INDEX idx_dwh_fact_delivery_year_month ON dwh.fact_delivery(year, month);
 CREATE INDEX idx_dwh_fact_delivery_time ON dwh.fact_delivery(delivery_time);
-
--- Comments
-COMMENT ON SCHEMA dwh IS 'Data Warehouse - Final dimensional model with SCD Type 2 support';
-COMMENT ON TABLE dwh.dim_date IS 'Date dimension for time-based analytics';
-COMMENT ON TABLE dwh.dim_customer IS 'Customer dimension with historical tracking (SCD Type 2)';
-COMMENT ON TABLE dwh.dim_driver IS 'Driver dimension with historical tracking (SCD Type 2)';
-COMMENT ON TABLE dwh.dim_vehicle IS 'Vehicle dimension with historical tracking (SCD Type 2)';
-COMMENT ON TABLE dwh.dim_route IS 'Route dimension with historical tracking (SCD Type 2)';
-COMMENT ON TABLE dwh.dim_package IS 'Package dimension with historical tracking (SCD Type 2)';
-COMMENT ON TABLE dwh.dim_warehouse IS 'Warehouse dimension with historical tracking (SCD Type 2)';
-COMMENT ON TABLE dwh.fact_delivery IS 'Main fact table for delivery transactions';

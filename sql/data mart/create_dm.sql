@@ -1,17 +1,12 @@
 -- ==========================================
 -- DATA MART - LOGISTICS ANALYTICS
--- MySQL Implementation
 -- ==========================================
--- Three focused data marts for business intelligence
 
 -- Create Data Mart database
-CREATE DATABASE IF NOT EXISTS logistics_datamart;
-USE logistics_datamart;
+CREATE DATABASE IF NOT EXISTS logistics_dm;
+USE logistics_dm;
 
--- ==========================================
 -- DATA MART 1: CUSTOMER ANALYTICS
--- ==========================================
--- Purpose: Customer behavior, segmentation, and performance analysis
 
 CREATE TABLE mart_customer_analytics (
     customer_key            BIGINT PRIMARY KEY,
@@ -53,13 +48,9 @@ CREATE TABLE mart_customer_analytics (
     INDEX idx_customer_type (customer_type),
     INDEX idx_loyalty_level (loyalty_level),
     INDEX idx_last_order_date (last_order_date)
-) ENGINE=InnoDB
-COMMENT = 'Customer analytics and performance metrics';
+);
 
--- ==========================================
 -- DATA MART 2: OPERATIONAL PERFORMANCE
--- ==========================================
--- Purpose: Daily/monthly delivery operations, driver, vehicle, and route performance
 
 -- Delivery Performance Summary (Time-based)
 CREATE TABLE mart_delivery_performance (
@@ -117,8 +108,7 @@ CREATE TABLE mart_delivery_performance (
     INDEX idx_date_value (date_value),
     INDEX idx_year_month (year, month),
     INDEX idx_quarter (quarter)
-) ENGINE=InnoDB
-COMMENT = 'Delivery performance metrics by day, month, and quarter';
+);
 
 -- Driver and Vehicle Performance
 CREATE TABLE mart_resource_performance (
@@ -171,13 +161,9 @@ CREATE TABLE mart_resource_performance (
     INDEX idx_status (status),
     INDEX idx_performance_rank (performance_rank),
     INDEX idx_performance_tier (performance_tier)
-) ENGINE=InnoDB
-COMMENT = 'Unified performance metrics for drivers, vehicles, and routes';
+);
 
--- ==========================================
 -- DATA MART 3: FINANCIAL ANALYTICS
--- ==========================================
--- Purpose: Revenue, cost, profitability analysis by various dimensions
 
 CREATE TABLE mart_financial_analytics (
     financial_id            BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -239,12 +225,9 @@ CREATE TABLE mart_financial_analytics (
     INDEX idx_quarter (quarter),
     INDEX idx_gross_margin (gross_margin_pct),
     INDEX idx_revenue (total_revenue)
-) ENGINE=InnoDB
-COMMENT = 'Financial analytics by province, route, customer type, and time period';
+);
 
--- ==========================================
 -- SUMMARY VIEWS FOR DASHBOARDS
--- ==========================================
 
 -- Executive Dashboard
 CREATE OR REPLACE VIEW v_executive_summary AS
@@ -304,9 +287,3 @@ FROM mart_financial_analytics
 WHERE period_type = 'MONTHLY'
   AND year = YEAR(CURDATE())
 ORDER BY year DESC, month DESC, total_revenue DESC;
-
--- Comments
-ALTER TABLE mart_customer_analytics COMMENT = 'Customer analytics and performance metrics';
-ALTER TABLE mart_delivery_performance COMMENT = 'Delivery operations performance by time period';
-ALTER TABLE mart_resource_performance COMMENT = 'Unified performance metrics for drivers, vehicles, and routes';
-ALTER TABLE mart_financial_analytics COMMENT = 'Financial performance by dimension (province, route, customer type)';

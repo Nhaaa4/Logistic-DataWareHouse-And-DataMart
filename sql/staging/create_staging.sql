@@ -1,16 +1,11 @@
 -- ==========================================
 -- STAGING LAYER - LOGISTICS DATA WAREHOUSE
--- PostgreSQL Implementation
 -- ==========================================
--- Temporary storage for ETL processes
--- Data is truncated after successful load to DWH
 
 -- Create Staging schema
 CREATE SCHEMA IF NOT EXISTS staging;
 
--- ==========================================
 -- STAGING TABLES (TEMPORARY)
--- ==========================================
 
 -- STG_CUSTOMER: Staging for customer data from CSV
 CREATE TABLE staging.stg_customer (
@@ -155,53 +150,3 @@ CREATE TABLE staging.stg_delivery (
     load_timestamp          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     source_file             VARCHAR(200)
 );
-
--- ==========================================
--- UTILITY FUNCTIONS FOR STAGING
--- ==========================================
-
--- Function to truncate all staging tables
-CREATE OR REPLACE FUNCTION staging.truncate_all_staging_tables()
-RETURNS void AS $$
-BEGIN
-    TRUNCATE TABLE staging.stg_customer CASCADE;
-    TRUNCATE TABLE staging.stg_driver CASCADE;
-    TRUNCATE TABLE staging.stg_vehicle CASCADE;
-    TRUNCATE TABLE staging.stg_package CASCADE;
-    TRUNCATE TABLE staging.stg_route CASCADE;
-    TRUNCATE TABLE staging.stg_warehouse CASCADE;
-    TRUNCATE TABLE staging.stg_delivery CASCADE;
-    RAISE NOTICE 'All staging tables truncated successfully';
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to get row counts for all staging tables
-CREATE OR REPLACE FUNCTION staging.get_staging_row_counts()
-RETURNS TABLE(table_name TEXT, row_count BIGINT) AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 'stg_customer'::TEXT, COUNT(*)::BIGINT FROM staging.stg_customer
-    UNION ALL
-    SELECT 'stg_driver'::TEXT, COUNT(*)::BIGINT FROM staging.stg_driver
-    UNION ALL
-    SELECT 'stg_vehicle'::TEXT, COUNT(*)::BIGINT FROM staging.stg_vehicle
-    UNION ALL
-    SELECT 'stg_package'::TEXT, COUNT(*)::BIGINT FROM staging.stg_package
-    UNION ALL
-    SELECT 'stg_route'::TEXT, COUNT(*)::BIGINT FROM staging.stg_route
-    UNION ALL
-    SELECT 'stg_warehouse'::TEXT, COUNT(*)::BIGINT FROM staging.stg_warehouse
-    UNION ALL
-    SELECT 'stg_delivery'::TEXT, COUNT(*)::BIGINT FROM staging.stg_delivery;
-END;
-$$ LANGUAGE plpgsql;
-
--- Comments
-COMMENT ON SCHEMA staging IS 'Temporary staging area for ETL processes - truncated after successful load';
-COMMENT ON TABLE staging.stg_customer IS 'Staging table for customer data from CSV files';
-COMMENT ON TABLE staging.stg_driver IS 'Staging table for driver data from CSV files';
-COMMENT ON TABLE staging.stg_vehicle IS 'Staging table for vehicle data from JSON API';
-COMMENT ON TABLE staging.stg_package IS 'Staging table for package data from JSON files';
-COMMENT ON TABLE staging.stg_route IS 'Staging table for route data';
-COMMENT ON TABLE staging.stg_warehouse IS 'Staging table for warehouse data';
-COMMENT ON TABLE staging.stg_delivery IS 'Staging table for delivery transaction data';

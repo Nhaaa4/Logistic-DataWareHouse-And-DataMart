@@ -20,9 +20,9 @@ POSTGRES_PASSWORD = '172839'
 # MySQL Data Mart connection
 MYSQL_HOST = 'localhost'
 MYSQL_PORT = '3306'
-MYSQL_DB = 'logistics_datamart'
+MYSQL_DB = 'logistics_dm'
 MYSQL_USER = 'root'
-MYSQL_PASSWORD = '172839'
+MYSQL_PASSWORD = '[Panha097]'
 
 default_args = {
     'owner': OWNER_DAG,
