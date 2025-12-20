@@ -359,11 +359,14 @@ def load_dim_vehicle(spark, postgres_url, postgres_properties):
 def load_dim_route(spark, postgres_url, postgres_properties):
     """Load route dimension with SCD Type 2"""
     staging_df = read_from_staging(spark, "stg_route", postgres_url, postgres_properties)
-    
+
     if staging_df.count() == 0:
         print("No route data in staging")
         return 0
-    
+
+    # Cast toll_required to boolean (PostgreSQL expects boolean, not integer)
+    staging_df = staging_df.withColumn("toll_required", col("toll_required").cast("boolean"))
+
     compare_columns = [
         'origin_country', 'origin_province', 'destination_country', 
         'destination_province', 'distance_km', 'average_time_min',
