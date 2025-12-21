@@ -7,7 +7,6 @@ from faker import Faker
 import os
 
 fake = Faker()
-random.seed(123)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SCRIPT_DIR = f"{SCRIPT_DIR}/data_sources"

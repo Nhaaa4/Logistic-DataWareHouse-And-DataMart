@@ -51,7 +51,7 @@ def read_from_dwh(spark, table_name, postgres_url, postgres_properties):
         return None
 
 
-def write_to_datamart(df, table_name, mysql_url, mysql_properties, mode="overwrite"):
+def write_to_datamart(df, table_name, mysql_url, mysql_properties, mode="append"):
     df.write.jdbc(
         url=mysql_url,
         table=table_name,
