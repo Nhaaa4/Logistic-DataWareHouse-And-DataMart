@@ -155,12 +155,16 @@ def scd_type2_dimension(spark, staging_df, dimension_name, business_key,
     
     # Records with changes
     changed_records = existing_records.filter(change_condition)
-    
-    print(f"New records to insert: {new_records.count()}")
-    print(f"Changed records to update: {changed_records.count()}")
-    
+
+    # Cache counts to avoid recomputation
+    new_records_count = new_records.count()
+    changed_records_count = changed_records.count()
+
+    print(f"New records to insert: {new_records_count}")
+    print(f"Changed records to update: {changed_records_count}")
+
     # Prepare new records to insert
-    if new_records.count() > 0:
+    if new_records_count > 0:
         # Select only staging columns and add SCD columns
         stg_columns = [col(f"stg.{c}") for c in staging_df.columns]
         new_inserts = new_records.select(*stg_columns) \
@@ -169,24 +173,24 @@ def scd_type2_dimension(spark, staging_df, dimension_name, business_key,
             .withColumn("is_current", lit(True)) \
             .withColumn("created_at", current_timestamp()) \
             .withColumn("updated_at", current_timestamp())
-        
+
         # Remove staging metadata columns
         cols_to_drop = ['load_timestamp', 'source_file']
         for col_name in cols_to_drop:
             if col_name in new_inserts.columns:
                 new_inserts = new_inserts.drop(col_name)
-        
+
         # Write new records
         new_inserts.write \
-            .jdbc(url=postgres_url, 
-                  table=f"dwh.{dimension_name}", 
-                  mode="append", 
+            .jdbc(url=postgres_url,
+                  table=f"dwh.{dimension_name}",
+                  mode="append",
                   properties=postgres_properties)
-        
-        print(f"Inserted {new_inserts.count()} new records")
-    
+
+        print(f"Inserted {new_records_count} new records")
+
     # Handle changed records (SCD Type 2)
-    if changed_records.count() > 0:
+    if changed_records_count > 0:
         # Get the surrogate keys of records to expire
         keys_to_expire = changed_records.select(
             col(f"dim.{dimension_name.replace('dim_', '')}_key").alias("surrogate_key")
@@ -210,7 +214,7 @@ def scd_type2_dimension(spark, staging_df, dimension_name, business_key,
             if col_name in new_versions.columns:
                 new_versions = new_versions.drop(col_name)
 
-        print(f"Creating new versions for {new_versions.count()} changed records")
+        print(f"Creating new versions for {changed_records_count} changed records")
 
         # Step 1: Expire old records first (before inserting new versions)
         surrogate_key_col = f"{dimension_name.replace('dim_', '')}_key"
@@ -228,13 +232,11 @@ def scd_type2_dimension(spark, staging_df, dimension_name, business_key,
                   table=f"dwh.{dimension_name}",
                   mode="append",
                   properties=postgres_properties)
-        print(f"Inserted {new_versions.count()} new version records")
-    
-    print(f"{'='*70}\n")
-    return new_records.count() + changed_records.count()
+        print(f"Inserted {changed_records_count} new version records")
+
+    return new_records_count + changed_records_count
 
 def load_dim_customer(spark, postgres_url, postgres_properties):
-    """Load customer dimension with SCD Type 2"""
     staging_df = read_from_staging(spark, "stg_customer", postgres_url, postgres_properties)
 
     if staging_df.count() == 0:
@@ -268,7 +270,6 @@ def load_dim_customer(spark, postgres_url, postgres_properties):
     )
 
 def load_dim_driver(spark, postgres_url, postgres_properties):
-    """Load driver dimension with SCD Type 2"""
     staging_df = read_from_staging(spark, "stg_driver", postgres_url, postgres_properties)
 
     if staging_df.count() == 0:
@@ -299,7 +300,6 @@ def load_dim_driver(spark, postgres_url, postgres_properties):
     )
 
 def load_dim_vehicle(spark, postgres_url, postgres_properties):
-    """Load vehicle dimension with SCD Type 2"""
     staging_df = read_from_staging(spark, "stg_vehicle", postgres_url, postgres_properties)
 
     if staging_df.count() == 0:
@@ -335,7 +335,6 @@ def load_dim_vehicle(spark, postgres_url, postgres_properties):
     )
 
 def load_dim_route(spark, postgres_url, postgres_properties):
-    """Load route dimension with SCD Type 2"""
     staging_df = read_from_staging(spark, "stg_route", postgres_url, postgres_properties)
 
     if staging_df.count() == 0:
@@ -357,7 +356,6 @@ def load_dim_route(spark, postgres_url, postgres_properties):
     )
 
 def load_dim_package(spark, postgres_url, postgres_properties):
-    """Load package dimension with SCD Type 2"""
     staging_df = read_from_staging(spark, "stg_package", postgres_url, postgres_properties)
 
     if staging_df.count() == 0:
@@ -381,7 +379,6 @@ def load_dim_package(spark, postgres_url, postgres_properties):
     )
 
 def load_dim_warehouse(spark, postgres_url, postgres_properties):
-    """Load warehouse dimension with SCD Type 2"""
     staging_df = read_from_staging(spark, "stg_warehouse", postgres_url, postgres_properties)
     
     if staging_df.count() == 0:
@@ -399,15 +396,6 @@ def load_dim_warehouse(spark, postgres_url, postgres_properties):
     )
 
 def load_dim_date(spark, postgres_url, postgres_properties):
-    """
-    Load date dimension
-    This should be pre-populated or updated separately
-    For this ETL, we'll check if dates exist and insert missing ones
-    """
-    print("\n" + "="*70)
-    print("Processing Date Dimension")
-    print("="*70)
-    
     # Read staging delivery to get dates
     staging_delivery = read_from_staging(spark, "stg_delivery", postgres_url, postgres_properties)
     
@@ -473,7 +461,6 @@ def load_dim_date(spark, postgres_url, postgres_properties):
     else:
         print("No new dates to insert")
     
-    print("="*70 + "\n")
     return new_dates.count()
 
 def load_fact_delivery(spark, postgres_url, postgres_properties):
@@ -605,8 +592,7 @@ def load_fact_delivery(spark, postgres_url, postgres_properties):
                   properties=postgres_properties)
         print(f"Inserted {fact_complete.count()} delivery facts")
         result_count = fact_complete.count()
-    
-    print("="*70 + "\n")
+        
     return result_count
 
 def main():    
