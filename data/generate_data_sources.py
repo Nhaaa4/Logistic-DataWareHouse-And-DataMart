@@ -2,6 +2,7 @@ import csv
 import json
 import sqlite3
 import random
+import uuid
 from datetime import datetime, timedelta
 from faker import Faker
 import os
@@ -13,6 +14,10 @@ SCRIPT_DIR = f"{SCRIPT_DIR}/data_sources"
 
 if not os.path.exists(SCRIPT_DIR):
     os.makedirs(SCRIPT_DIR)
+
+
+def generate_uuid():
+    return str(uuid.uuid4())
 
 NUM_CUSTOMERS = 50
 NUM_DRIVERS = 5         
@@ -42,12 +47,13 @@ def generate_customers_csv():
     print("Generating customers CSV...")
     
     filename = os.path.join(SCRIPT_DIR, "customers.csv")
-    
+    customer_ids = []
+
     with open(filename, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(['customer_id', 'customer_name', 'gender', 'date_of_birth', 'phone', 
-                        'email', 'address', 'commune', 'district', 'province', 'country', 
-                        'postal_code', 'customer_type', 'registration_date', 'loyalty_level', 
+        writer.writerow(['customer_id', 'customer_name', 'gender', 'date_of_birth', 'phone',
+                        'email', 'address', 'commune', 'district', 'province', 'country',
+                        'postal_code', 'customer_type', 'registration_date', 'loyalty_level',
                         'preferred_contact', 'is_active'])
         
         for i in range(1, NUM_CUSTOMERS + 1):
@@ -59,9 +65,12 @@ def generate_customers_csv():
                 reg_date = START_DATE + timedelta(days=random.randint(0, DAYS_OF_DATA))
             else:
                 reg_date = START_DATE + timedelta(days=random.randint(DAYS_OF_DATA - 180, DAYS_OF_DATA))
-            
+
+            customer_id = generate_uuid()
+            customer_ids.append(customer_id)
+
             writer.writerow([
-                f"CUST{i:07d}",
+                customer_id,
                 fake.name(),
                 gender,
                 dob,
@@ -79,38 +88,44 @@ def generate_customers_csv():
                 random.choice(['Email', 'Phone', 'SMS']),
                 random.choice([True, False]) if random.random() > 0.1 else True
             ])
-            
+
             if i % 10000 == 0:
                 print(f"  ... {i:,}/{NUM_CUSTOMERS:,} customers")
+
+    return customer_ids
     
 def generate_drivers_csv():
     # Generate driver data as single CSV file
     print("Generating drivers CSV...")
-    
+
     filename = os.path.join(SCRIPT_DIR, "drivers.csv")
-    
+    driver_ids = []
+
     with open(filename, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(['driver_id', 'driver_name', 'gender', 'date_of_birth', 'phone', 
-                        'license_number', 'license_type', 'license_expiry', 'hire_date', 
-                        'experience_years', 'emergency_contact', 'employment_type', 
+        writer.writerow(['driver_id', 'driver_name', 'gender', 'date_of_birth', 'phone',
+                        'license_number', 'license_type', 'license_expiry', 'hire_date',
+                        'experience_years', 'emergency_contact', 'employment_type',
                         'rating', 'status', 'base_city'])
-        
+
         for i in range(1, NUM_DRIVERS + 1):
             gender = random.choice(['M', 'F'])
             dob = fake.date_of_birth(minimum_age=25, maximum_age=65)
-            
+
             # Early hires (30%) spread across first 9 months, recent hires (70%) in last 3 months
             if random.random() < 0.3:
                 hire_date = START_DATE + timedelta(days=random.randint(0, 270))
             else:
                 hire_date = START_DATE + timedelta(days=random.randint(DAYS_OF_DATA - 90, DAYS_OF_DATA))
-            
+
             # License expiry: 1-5 years from hire date
             license_expiry = hire_date + timedelta(days=random.randint(365, 1825))
-            
+
+            driver_id = generate_uuid()
+            driver_ids.append(driver_id)
+
             writer.writerow([
-                f"DRV{i:06d}",
+                driver_id,
                 fake.name(),
                 gender,
                 dob,
@@ -127,20 +142,27 @@ def generate_drivers_csv():
                 random.choice(PROVINCES)
             ])
 
+    return driver_ids
+
 def generate_vehicles_json():
     # Generate vehicle data as single JSON file (API response)
     print("Generating vehicles JSON (API response)...")
-    
+
     vehicles = []
+    vehicle_ids = []
+
     for i in range(1, NUM_VEHICLES + 1):
         # initial fleet (40%) first 8 months, expansion (60%) last 4 months
         if random.random() < 0.4:
             purchase_date = START_DATE + timedelta(days=random.randint(0, 240))
         else:
             purchase_date = START_DATE + timedelta(days=random.randint(DAYS_OF_DATA - 120, DAYS_OF_DATA))
-        
+
+        vehicle_id = generate_uuid()
+        vehicle_ids.append(vehicle_id)
+
         vehicle = {
-            "vehicle_id": f"VEH{i:06d}",
+            "vehicle_id": vehicle_id,
             "plate_number": f"{random.choice(['PP', 'SR', 'BB', 'KM', 'KP'])}-{random.randint(1000, 9999)}",
             "vehicle_type": random.choice(VEHICLE_TYPES),
             "brand": random.choice(['Toyota', 'Isuzu', 'Mitsubishi', 'Honda', 'Ford', 'Hino', 'Fuso']),
@@ -158,7 +180,7 @@ def generate_vehicles_json():
             "purchase_date": purchase_date.strftime('%Y-%m-%d')
         }
         vehicles.append(vehicle)
-    
+
     # Simulate API response
     api_response = {
         "status": "success",
@@ -166,16 +188,20 @@ def generate_vehicles_json():
         "total_records": NUM_VEHICLES,
         "data": vehicles
     }
-    
+
     filename = os.path.join(SCRIPT_DIR, "vehicles_api.json")
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(api_response, f, indent=2)
+
+    return vehicle_ids
     
 def generate_packages_json():
     # Generate package data as single JSON file
     print("Generating packages JSON...")
-    
+
     packages = []
+    package_ids = []
+
     for i in range(1, NUM_PACKAGES + 1):
         # 1-7 days before use (just-in-time logistics)
         created_date = START_DATE + timedelta(days=random.randint(max(0, DAYS_OF_DATA - 7), DAYS_OF_DATA))
@@ -183,9 +209,12 @@ def generate_packages_json():
         width = round(random.uniform(10, 80), 2)
         height = round(random.uniform(10, 80), 2)
         volume = round(length * width * height, 2)
-        
+
+        package_id = generate_uuid()
+        package_ids.append(package_id)
+
         package = {
-            "package_id": f"PKG{i:07d}",
+            "package_id": package_id,
             "package_type": random.choice(PACKAGE_TYPES),
             "weight_kg": round(random.uniform(0.5, 500), 2),
             "length_cm": length,
@@ -205,10 +234,12 @@ def generate_packages_json():
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump({"packages": packages, "total": NUM_PACKAGES}, f, indent=2)
 
+    return package_ids
+
 def generate_routes_database(cursor, conn):
     # Generate route data in SQLite database
     print("Generating routes in database...")
-    
+
     cursor.execute('DROP TABLE IF EXISTS routes')
     cursor.execute('''
         CREATE TABLE routes (
@@ -225,15 +256,20 @@ def generate_routes_database(cursor, conn):
             region TEXT
         )
     ''')
-    
-    for i in range(1, NUM_ROUTES + 1):
+
+    route_ids = []
+
+    for _ in range(1, NUM_ROUTES + 1):
         origin = random.choice(PROVINCES)
         destination = random.choice([p for p in PROVINCES if p != origin])
-        
+
+        route_id = generate_uuid()
+        route_ids.append(route_id)
+
         cursor.execute('''
             INSERT INTO routes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            f"RT{i:05d}",
+            route_id,
             "Cambodia",
             origin,
             "Cambodia",
@@ -245,13 +281,14 @@ def generate_routes_database(cursor, conn):
             1 if random.random() > 0.5 else 0,
             random.choice(['North', 'South', 'East', 'West', 'Central'])
         ))
-    
+
     conn.commit()
+    return route_ids
 
 def generate_warehouses_database(cursor, conn):
     # Generate warehouse data in SQLite database
     print("Generating warehouses in database...")
-    
+
     cursor.execute('DROP TABLE IF EXISTS warehouses')
     cursor.execute('''
         CREATE TABLE warehouses (
@@ -265,12 +302,17 @@ def generate_warehouses_database(cursor, conn):
             operational_status TEXT
         )
     ''')
-    
-    for i in range(1, NUM_WAREHOUSES + 1):
+
+    warehouse_ids = []
+
+    for _ in range(1, NUM_WAREHOUSES + 1):
+        warehouse_id = generate_uuid()
+        warehouse_ids.append(warehouse_id)
+
         cursor.execute('''
             INSERT INTO warehouses VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            f"WH{i:04d}",
+            warehouse_id,
             f"Warehouse {fake.city()}",
             random.choice(PROVINCES),
             "Cambodia",
@@ -279,13 +321,14 @@ def generate_warehouses_database(cursor, conn):
             fake.phone_number(),
             random.choice(['Operational', 'Under Maintenance', 'Closed'])
         ))
-    
-    conn.commit()
 
-def generate_deliveries_database(cursor, conn):
+    conn.commit()
+    return warehouse_ids
+
+def generate_deliveries_database(cursor, conn, customer_ids, driver_ids, vehicle_ids, route_ids, package_ids, warehouse_ids):
     # Generate delivery fact data in same database
     print("Generating deliveries in database...")
-    
+
     cursor.execute('DROP TABLE IF EXISTS deliveries')
     cursor.execute('''
         CREATE TABLE deliveries (
@@ -316,7 +359,7 @@ def generate_deliveries_database(cursor, conn):
             delivery_date DATE
         )
     ''')
-    
+
     for i in range(1, NUM_DELIVERIES + 1):
         # Business day (Monday-Saturday, excluding 10% for Sundays)
         pickup_date = START_DATE + timedelta(days=random.randint(0, DAYS_OF_DATA))
@@ -383,13 +426,13 @@ def generate_deliveries_database(cursor, conn):
         cursor.execute('''
             INSERT INTO deliveries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            f"DEL{i:09d}",
-            f"CUST{random.randint(1, NUM_CUSTOMERS):07d}",
-            f"DRV{random.randint(1, NUM_DRIVERS):06d}",
-            f"VEH{random.randint(1, NUM_VEHICLES):06d}",
-            f"RT{random.randint(1, NUM_ROUTES):05d}",
-            f"PKG{random.randint(1, NUM_PACKAGES):07d}",
-            f"WH{random.randint(1, NUM_WAREHOUSES):04d}",
+            generate_uuid(),  # UUID for delivery_id
+            random.choice(customer_ids),
+            random.choice(driver_ids),
+            random.choice(vehicle_ids),
+            random.choice(route_ids),
+            random.choice(package_ids),
+            random.choice(warehouse_ids),
             pickup_time.strftime('%Y-%m-%d %H:%M:%S'),
             departure_time.strftime('%Y-%m-%d %H:%M:%S'),
             arrival_time.strftime('%Y-%m-%d %H:%M:%S'),
@@ -440,29 +483,20 @@ def format_size(bytes):
 def main():
     # Main function to generate all full load data sources
     start_time = datetime.now()
+    customer_ids = generate_customers_csv()
+    driver_ids = generate_drivers_csv()
     
-    # CSV sources
-    print("Generating CSV files...")
-    generate_customers_csv()
-    generate_drivers_csv()
+    vehicle_ids = generate_vehicles_json()
+    package_ids = generate_packages_json()
     print()
-    
-    # JSON/API sources
-    print("Generating JSON/API files...")
-    generate_vehicles_json()
-    generate_packages_json()
-    print()
-    
-    # Database sources
-    print("Generating database files...")
+
     db_path = os.path.join(SCRIPT_DIR, "logistics_source.db")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    generate_routes_database(cursor, conn)
-    generate_warehouses_database(cursor, conn)
-    generate_deliveries_database(cursor, conn)
+    route_ids = generate_routes_database(cursor, conn)
+    warehouse_ids = generate_warehouses_database(cursor, conn)
+    generate_deliveries_database(cursor, conn, customer_ids, driver_ids, vehicle_ids, route_ids, package_ids, warehouse_ids)
     conn.close()
-    print()
     
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()

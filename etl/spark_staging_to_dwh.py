@@ -7,11 +7,11 @@ from pyspark.sql.functions import (
     floor, concat_ws
 )
 import pyspark.sql.functions as F
+import psycopg2
 import sys
 from datetime import datetime
 
 def create_spark_session(app_name="Staging to DWH ETL with SCD Type 2"):
-    """Create and return a Spark session"""
     return SparkSession.builder \
         .appName(app_name) \
         .config("spark.jars", "/home/hadoop/logistic/jdbc/postgresql-42.6.0.jar") \
@@ -32,54 +32,45 @@ def expire_records_via_spark(spark, dimension_name, surrogate_key_col, keys_to_e
     if not keys_to_expire:
         return 0
 
-    # Read all records from the dimension table
-    existing_df = spark.read.jdbc(
-        url=postgres_url,
-        table=f"dwh.{dimension_name}",
-        properties=postgres_properties
+    url_parts = postgres_url.replace("jdbc:postgresql://", "").split("/")
+    host_port = url_parts[0].split(":")
+    host = host_port[0]
+    port = int(host_port[1]) if len(host_port) > 1 else 5432
+    database = url_parts[1] if len(url_parts) > 1 else "postgres"
+
+    # Connect to PostgreSQL directly
+    conn = psycopg2.connect(
+        host=host,
+        port=port,
+        database=database,
+        user=postgres_properties["user"],
+        password=postgres_properties["password"]
     )
 
-    # Create a DataFrame with keys to expire
-    keys_df = spark.createDataFrame([(k,) for k in keys_to_expire], [surrogate_key_col])
+    try:
+        cursor = conn.cursor()
 
-    # Split into records to expire and records to keep unchanged
-    records_to_expire = existing_df.join(
-        keys_df,
-        existing_df[surrogate_key_col] == keys_df[surrogate_key_col],
-        "inner"
-    ).drop(keys_df[surrogate_key_col]).filter(col("is_current") == True)
+        # Build the UPDATE query to expire records
+        keys_str = ", ".join(str(k) for k in keys_to_expire)
 
-    records_unchanged = existing_df.join(
-        keys_df,
-        existing_df[surrogate_key_col] == keys_df[surrogate_key_col],
-        "left_anti"
-    )
+        update_query = f"""
+            UPDATE dwh.{dimension_name}
+            SET is_current = FALSE,
+                expiry_date = CURRENT_DATE,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE {surrogate_key_col} IN ({keys_str})
+              AND is_current = TRUE
+        """
 
-    # Also keep already expired records (is_current = False) from the keys_to_expire set
-    already_expired = existing_df.join(
-        keys_df,
-        existing_df[surrogate_key_col] == keys_df[surrogate_key_col],
-        "inner"
-    ).drop(keys_df[surrogate_key_col]).filter(col("is_current") == False)
+        cursor.execute(update_query)
+        affected_rows = cursor.rowcount
+        conn.commit()
 
-    # Update the records to expire
-    expired_records = records_to_expire \
-        .withColumn("expiry_date", current_date()) \
-        .withColumn("is_current", lit(False)) \
-        .withColumn("updated_at", current_timestamp())
+        return affected_rows
 
-    # Combine all records
-    final_df = records_unchanged.unionByName(expired_records).unionByName(already_expired)
-
-    # Overwrite the dimension table
-    final_df.write.jdbc(
-        url=postgres_url,
-        table=f"dwh.{dimension_name}",
-        mode="overwrite",
-        properties=postgres_properties
-    )
-
-    return expired_records.count()
+    finally:
+        cursor.close()
+        conn.close()
 
 def read_from_staging(spark, table_name, postgres_url, postgres_properties):
     """Read data from staging table"""
