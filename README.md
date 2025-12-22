@@ -2,6 +2,31 @@
 
 A modern data engineering infrastructure for logistics and delivery operations, implementing a complete ETL pipeline: (Raw → Staging → Data Warehouse → Data Mart).
 
+
+## Table of Contents
+
+- [Table of Contents](#table-of-contents)
+- [Architecture Overview](#architecture-overview)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Data Model](#data-model)
+    - [Staging Layer (PostgreSQL)](#staging-layer-postgresql)
+    - [Data Warehouse - Star Schema (PostgreSQL)](#data-warehouse---star-schema-postgresql)
+    - [Data Mart (MySQL)](#data-mart-mysql)
+- [Key Features](#key-features)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+    - [Step 1 Clone Repository](#step-1-clone-repository)
+    - [Step 2 Install Python Dependencies](#step-2-install-python-dependencies)
+    - [Step 3 Generate Sample Data](#step-3-generate-sample-data)
+    - [Step 4 Create Databases](#step-4-create-databases)
+    - [Step 5 Configure Airflow](#step-5-configure-airflow)
+    - [Step 6 Access Airflow UI](#step-6-access-airflow-ui)
+- [Configuration](#configuration)
+- [Pipeline Schedule](#pipeline-schedule)
+- [License](#license)
+
+
 ## Architecture Overview
 
 ![etl-flow](assests/image.png)
